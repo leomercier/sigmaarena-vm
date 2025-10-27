@@ -39,6 +39,8 @@ async function executeUserScript(): Promise<void> {
         };
 
         writeFileSync('/app/output/result.json', JSON.stringify(output, null, 4));
+
+        process.exit(0);
     } catch (err) {
         const executionTime = Date.now() - startTime;
         const output = {
@@ -49,8 +51,12 @@ async function executeUserScript(): Promise<void> {
             timestamp: new Date().toISOString()
         };
 
+        console.error('Error executing user script', JSON.stringify(output, null, 4));
+
         writeFileSync('/app/output/result.json', JSON.stringify(output, null, 4));
 
         process.exit(1);
     }
 }
+
+executeUserScript();
