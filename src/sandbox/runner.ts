@@ -17,6 +17,26 @@ async function executeUserScript(): Promise<void> {
     const startTime = Date.now();
 
     try {
+        // Clear proxy settings for localhost / internal communication
+        // to prevent axios from proxying requests to the proxy itself
+        delete process.env.NO_PROXY;
+        delete process.env.no_proxy;
+
+        const injectedFunctionsPath = join('/app/scripts/injected_functions.js');
+        try {
+            const injectedModule = await import(injectedFunctionsPath);
+
+            // Attach all exported functions to global scope
+            Object.keys(injectedModule).forEach((key) => {
+                if (typeof injectedModule[key] === 'function') {
+                    (global as any)[key] = injectedModule[key];
+                    console.log(`[Sandbox] Injected function: ${key}`);
+                }
+            });
+        } catch (err) {
+            console.log('[Sandbox] No injected functions file found');
+        }
+
         const userScriptPath = join('/app/scripts/user_script.ts');
         const userModule = (await import(userScriptPath)) as UserScript;
 

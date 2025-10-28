@@ -14,6 +14,7 @@ interface SandboxConfig {
     maxMemoryMb?: number;
     maxStorageMb?: number;
     allowedEndpoints?: string[];
+    injectedFunctions?: Record<string, (...args: any[]) => any>;
 }
 
 interface SandboxResult {
@@ -76,6 +77,12 @@ export class SandboxManager {
 
             // Write user script to file
             writeFileSync(join(scriptsDir, 'user_script.ts'), sandboxConfig.script);
+
+            // Write injected functions if provided
+            if (sandboxConfig.injectedFunctions) {
+                const functionsCode = this.generateInjectedFunctionsModule(sandboxConfig.injectedFunctions);
+                writeFileSync(join(scriptsDir, 'injected_functions.js'), functionsCode);
+            }
 
             // Update proxy with allowed endpoints
             if (this.proxy && sandboxConfig.allowedEndpoints && sandboxConfig.allowedEndpoints.length > 0) {
@@ -263,6 +270,18 @@ export class SandboxManager {
                 resolve('172.17.0.1');
             });
         });
+    }
+
+    private generateInjectedFunctionsModule(functions: Record<string, (...args: any[]) => any>): string {
+        // Serialize functions to a JavaScript module
+        const functionExports = Object.entries(functions)
+            .map(([name, fn]) => {
+                // Convert function to string and export it
+                return `export const ${name} = ${fn.toString()};`;
+            })
+            .join('\n\n');
+
+        return functionExports;
     }
 
     async stopContainer(containerId: string): Promise<void> {
