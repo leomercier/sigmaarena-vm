@@ -1,4 +1,4 @@
-# SigmaArena VM
+# SigmaArena VM - SN127
 
 The SigmaArena Virtual Machine (VM) provides a sandboxed execution environment for evaluating on-chain and off-chain trading strategies before they are deployed into the SigmaArena competition. It bundles a deterministic simulation engine, strategy lifecycle helpers, and tooling to safely import user-authored TypeScript strategies with exchange-like trade functions.
 
