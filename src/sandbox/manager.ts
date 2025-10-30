@@ -1,13 +1,13 @@
 import { ChildProcess, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { delays } from '../utils/delays';
 import { getErrorMetadata } from '../utils/errors';
 import { logDebug, logError, logInfo } from '../utils/logging';
 import { FilteringProxy } from './proxy_server';
 
-interface SandboxConfig {
+export interface SandboxConfig {
     script: string;
     timeoutMs?: number;
     maxCpus?: number;
@@ -15,9 +15,10 @@ interface SandboxConfig {
     maxStorageMb?: number;
     allowedEndpoints?: string[];
     injectedFunctions?: Record<string, (...args: any[]) => any>;
+    files?: Record<string, string>;
 }
 
-interface SandboxResult {
+export interface SandboxResult {
     success: boolean;
     result?: any;
     error?: string;
@@ -77,6 +78,14 @@ export class SandboxManager {
 
             // Write user script to file
             writeFileSync(join(scriptsDir, 'user_script.ts'), sandboxConfig.script);
+
+            // Write additional files
+            if (sandboxConfig.files) {
+                for (const [filename, content] of Object.entries(sandboxConfig.files)) {
+                    mkdirSync(dirname(join(scriptsDir, filename)), { recursive: true });
+                    writeFileSync(join(scriptsDir, filename), content);
+                }
+            }
 
             // Write injected functions if provided
             if (sandboxConfig.injectedFunctions) {
@@ -161,6 +170,8 @@ export class SandboxManager {
             } catch (err) {
                 logError('Cleanup error', getErrorMetadata(err as Error));
             }
+
+            await this.cleanup();
         }
     }
 

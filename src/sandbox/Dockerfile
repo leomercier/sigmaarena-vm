@@ -7,7 +7,7 @@ WORKDIR /app
 RUN npm install -g typescript tsx
 
 # Install allowed npm packages
-RUN npm install axios lodash dayjs
+RUN npm install axios lodash dayjs uuid
 
 COPY src/sandbox/runner.ts /app/runner.ts
 

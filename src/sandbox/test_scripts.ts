@@ -6,12 +6,12 @@ async function runExamples() {
     // Example 1: Simple calculation
     console.log('\n=== Example 1: Simple Calculation ===');
     const simpleScript = `
-    export async function runScript() {
-      const numbers = [1, 2, 3, 4, 5];
-      const sum = numbers.reduce((a, b) => a + b, 0);
-      return { sum, average: sum / numbers.length };
-    }
-  `;
+      export async function runScript() {
+        const numbers = [1, 2, 3, 4, 5];
+        const sum = numbers.reduce((a, b) => a + b, 0);
+        return { sum, average: sum / numbers.length };
+      }
+    `;
 
     const result1 = await manager.executeScript({
         script: simpleScript,
@@ -24,23 +24,23 @@ async function runExamples() {
     // Example 2: Using allowed libraries
     console.log('\n=== Example 2: Using Lodash ===');
     const lodashScript = `
-    import _ from 'lodash';
-    
-    export async function runScript() {
-      const data = [
-        { category: 'A', value: 10 },
-        { category: 'B', value: 20 },
-        { category: 'A', value: 15 }
-      ];
+      import _ from 'lodash';
       
-      const grouped = _.groupBy(data, 'category');
-      const summed = _.mapValues(grouped, items => 
-        _.sumBy(items, 'value')
-      );
-      
-      return summed;
-    }
-  `;
+      export async function runScript() {
+        const data = [
+          { category: 'A', value: 10 },
+          { category: 'B', value: 20 },
+          { category: 'A', value: 15 }
+        ];
+
+        const grouped = _.groupBy(data, 'category');
+        const summed = _.mapValues(grouped, items =>
+          _.sumBy(items, 'value')
+        );
+
+        return summed;
+      }
+    `;
 
     const result2 = await manager.executeScript({
         script: lodashScript,
@@ -51,24 +51,24 @@ async function runExamples() {
     // Example 3: API call (requires network access)
     console.log('\n=== Example 3: API Call ===');
     const apiScript = `
-    import axios from 'axios';
-    
-    export async function runScript() {
-      try {
-        const response = await axios.get('https://api.github.com/repos/microsoft/typescript', {
-          timeout: 5000
-        });
-        
-        return {
-          repository: response.data.name,
-          stars: response.data.stargazers_count,
-          language: response.data.language
-        };
-      } catch (error) {
-        throw new Error('Failed to fetch data: ' + error.message);
+      import axios from 'axios';
+
+      export async function runScript() {
+        try {
+          const response = await axios.get('https://api.github.com/repos/microsoft/typescript', {
+            timeout: 5000
+          });
+
+          return {
+            repository: response.data.name,
+            stars: response.data.stargazers_count,
+            language: response.data.language
+          };
+        } catch (error) {
+          throw new Error('Failed to fetch data: ' + error.message);
+        }
       }
-    }
-  `;
+    `;
 
     const result3 = await manager.executeScript({
         script: apiScript,
@@ -80,12 +80,12 @@ async function runExamples() {
     // Example 4: Timeout handling
     console.log('\n=== Example 4: Timeout Test ===');
     const timeoutScript = `
-    export async function runScript() {
-      // This will timeout
-      await new Promise(resolve => setTimeout(resolve, 60000));
-      return { message: 'This will never be reached' };
-    }
-  `;
+      export async function runScript() {
+        // This will timeout
+        await new Promise(resolve => setTimeout(resolve, 60000));
+        return { message: 'This will never be reached' };
+      }
+    `;
 
     const result4 = await manager.executeScript({
         script: timeoutScript,
@@ -96,10 +96,10 @@ async function runExamples() {
     // Example 5: Error handling
     console.log('\n=== Example 5: Error Handling ===');
     const errorScript = `
-    export async function runScript() {
-      throw new Error('Intentional error for testing');
-    }
-  `;
+      export async function runScript() {
+        throw new Error('Intentional error for testing');
+      }
+    `;
 
     const result5 = await manager.executeScript({
         script: errorScript,
@@ -113,11 +113,11 @@ async function runExamples() {
         .fill(null)
         .map(
             (_, i) => `
-    export async function runScript() {
-      await new Promise(resolve => setTimeout(resolve, ${1000 + i * 500}));
-      return { taskId: ${i}, completed: true };
-    }
-  `
+              export async function runScript() {
+                await new Promise(resolve => setTimeout(resolve, ${1000 + i * 500}));
+                return { taskId: ${i}, completed: true };
+              }
+            `
         );
 
     const results = await Promise.all(
