@@ -6,6 +6,8 @@ interface Config {
     slackApiToken: string;
     slackChannel: string;
 
+    exchangeConfigs: Record<string, string>;
+
     developmentConfig: DevelopmentConfig;
 }
 
@@ -18,10 +20,34 @@ const config: Config = {
     slackApiToken: process.env.SLACK_API_TOKEN || '',
     slackChannel: process.env.SLACK_CHANNEL || '',
 
+    exchangeConfigs: getExchangeConfigs(),
+
     developmentConfig: {
         enabled: process.env.DEVELOPMENT_ENABLED === 'true',
         logRawToConsole: process.env.DEVELOPMENT_LOG_RAW_TO_CONSOLE === 'true'
     }
 };
+
+function getExchangeConfigs(): Record<string, string> {
+    const exchangeConfigs: Record<string, string> = {};
+
+    const exchangeKeys = Object.keys(process.env).filter((key) => key.startsWith('EXCHANGE_'));
+
+    for (const key of exchangeKeys) {
+        const exchangeName = key.split('_')[1];
+        if (!exchangeName) {
+            continue;
+        }
+
+        const exchangeConfig = process.env[key];
+        if (!exchangeConfig) {
+            continue;
+        }
+
+        exchangeConfigs[exchangeName.toLowerCase()] = exchangeConfig;
+    }
+
+    return exchangeConfigs;
+}
 
 export default config;

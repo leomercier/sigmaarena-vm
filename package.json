@@ -13,6 +13,7 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "ccxt": "^4.5.14",
         "dotenv": "^17.2.0",
         "tsx": "^4.20.6",
         "uuid": "^13.0.0"
