@@ -273,4 +273,4 @@ class RandomStrategy extends Trading {
     }
 }
 
-export default new RandomStrategy();
+export default RandomStrategy;

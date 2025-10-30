@@ -22,20 +22,18 @@ export class OrderProcessor {
         this.random = new SeededRandom(config.randomSeed ?? Date.now());
     }
 
-    processOrders(): void {
+    processOrders(currentDate: Date): void {
         const activeOrders = this.orderBook.getActiveOrders();
 
         for (const order of activeOrders) {
-            this.processOrder(order);
+            this.processOrder(order, currentDate);
         }
     }
 
-    private processOrder(order: SimulatedOrder): void {
-        const now = Date.now();
-
+    private processOrder(order: SimulatedOrder, currentDate: Date): void {
         // Check for auto-cancellation
-        if (this.shouldAutoCancelOrder(order, now)) {
-            const updated = cancelOrder(order, 'Auto-cancelled after timeout');
+        if (this.shouldAutoCancelOrder(order, currentDate.getTime())) {
+            const updated = cancelOrder(order, 'Auto-cancelled after timeout', currentDate.getTime());
             this.orderBook.updateOrder(updated);
 
             // Release committed balance
@@ -52,10 +50,10 @@ export class OrderProcessor {
         // Process based on fill strategy
         switch (this.config.orderFillStrategy) {
             case 'delayed':
-                this.processDelayedOrder(order, now);
+                this.processDelayedOrder(order, currentDate.getTime());
                 break;
             case 'gradual':
-                this.processGradualOrder(order, now);
+                this.processGradualOrder(order, currentDate.getTime());
                 break;
             case 'never':
                 // Orders stay pending forever
@@ -66,19 +64,19 @@ export class OrderProcessor {
         }
     }
 
-    private processDelayedOrder(order: SimulatedOrder, now: number): void {
+    private processDelayedOrder(order: SimulatedOrder, currentDate: number): void {
         if (!order.scheduledFillTime) {
             return;
         }
 
-        if (now >= order.scheduledFillTime) {
-            this.fillOrder(order, order.remainingAmount);
+        if (currentDate >= order.scheduledFillTime) {
+            this.fillOrder(order, order.remainingAmount, currentDate);
         }
     }
 
-    private processGradualOrder(order: SimulatedOrder, now: number): void {
+    private processGradualOrder(order: SimulatedOrder, currentDate: number): void {
         const intervalMs = this.config.gradualFillIntervalMs || 1000;
-        const timeSinceLastUpdate = now - order.lastUpdatedAt;
+        const timeSinceLastUpdate = currentDate - order.lastUpdatedAt;
 
         if (timeSinceLastUpdate < intervalMs) {
             return;
@@ -88,24 +86,24 @@ export class OrderProcessor {
         const fillPercentage = this.config.partialFillPercentage || 0.3;
         const fillAmount = order.remainingAmount * fillPercentage;
 
-        this.fillOrder(order, fillAmount);
+        this.fillOrder(order, fillAmount, currentDate);
     }
 
     /**
      * Fill an order (fully or partially)
      */
-    private fillOrder(order: SimulatedOrder, fillAmount: number): void {
+    private fillOrder(order: SimulatedOrder, fillAmount: number, currentDate: number): void {
         // Get execution price
         const executionPrice = this.priceOracle.getExecutionPrice(order.token, order.action, this.config.slippagePercentage || 0);
 
         if (!executionPrice) {
-            const updated = rejectOrder(order, `No price available for ${order.token}`);
+            const updated = rejectOrder(order, `No price available for ${order.token}`, currentDate);
             this.orderBook.updateOrder(updated);
             return;
         }
 
         // Apply the fill
-        const updated = applyFill(order, fillAmount, executionPrice);
+        const updated = applyFill(order, fillAmount, executionPrice, currentDate);
         this.orderBook.updateOrder(updated);
 
         // Update wallet

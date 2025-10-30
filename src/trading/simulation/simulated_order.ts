@@ -43,13 +43,12 @@ export function createSimulatedOrder(
     orderType: OrderType,
     requestedPrice: number | undefined,
     leverage: number,
-    isFutures: boolean
+    isFutures: boolean,
+    timestamp: number
 ): SimulatedOrder {
-    const now = Date.now();
-
     return {
         id,
-        timestamp: now,
+        timestamp,
         action,
         token,
         baseToken,
@@ -62,14 +61,14 @@ export function createSimulatedOrder(
         leverage,
         isFutures,
         status: 'pending',
-        createdAt: now,
-        lastUpdatedAt: now,
+        createdAt: timestamp,
+        lastUpdatedAt: timestamp,
         fillProgress: 0,
         totalCost: 0
     };
 }
 
-export function applyFill(order: SimulatedOrder, fillAmount: number, fillPrice: number): SimulatedOrder {
+export function applyFill(order: SimulatedOrder, fillAmount: number, fillPrice: number, timestamp: number): SimulatedOrder {
     const newFilledAmount = order.filledAmount + fillAmount;
     const newRemainingAmount = order.requestedAmount - newFilledAmount;
 
@@ -95,42 +94,42 @@ export function applyFill(order: SimulatedOrder, fillAmount: number, fillPrice: 
         executionPrice: newExecutionPrice,
         totalCost: newTotalCost,
         status: newStatus,
-        lastUpdatedAt: Date.now(),
+        lastUpdatedAt: timestamp,
         fillProgress: newFilledAmount / order.requestedAmount
     };
 }
 
-export function rejectOrder(order: SimulatedOrder, reason: string): SimulatedOrder {
+export function rejectOrder(order: SimulatedOrder, reason: string, timestamp: number): SimulatedOrder {
     return {
         ...order,
         status: 'rejected',
         rejectionReason: reason,
-        lastUpdatedAt: Date.now()
+        lastUpdatedAt: timestamp
     };
 }
 
-export function cancelOrder(order: SimulatedOrder, reason: string): SimulatedOrder {
+export function cancelOrder(order: SimulatedOrder, reason: string, timestamp: number): SimulatedOrder {
     return {
         ...order,
         status: 'cancelled',
         cancellationReason: reason,
-        lastUpdatedAt: Date.now()
+        lastUpdatedAt: timestamp
     };
 }
 
-export function openOrder(order: SimulatedOrder): SimulatedOrder {
+export function openOrder(order: SimulatedOrder, timestamp: number): SimulatedOrder {
     return {
         ...order,
         status: 'open',
-        lastUpdatedAt: Date.now()
+        lastUpdatedAt: timestamp
     };
 }
 
-export function scheduleOrderFill(order: SimulatedOrder, fillTime: number): SimulatedOrder {
+export function scheduleOrderFill(order: SimulatedOrder, fillTime: number, timestamp: number): SimulatedOrder {
     return {
         ...order,
         scheduledFillTime: fillTime,
         status: 'open',
-        lastUpdatedAt: Date.now()
+        lastUpdatedAt: timestamp
     };
 }

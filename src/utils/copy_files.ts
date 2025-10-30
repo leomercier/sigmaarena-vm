@@ -3,7 +3,7 @@ import { logError } from './logging';
 
 async function copyNonTsFiles() {
     try {
-        const extensionsToCopy = ['.html', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', 'Dockerfile'];
+        const extensionsToCopy = ['.ts', '.html', '.css', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.ico', 'Dockerfile'];
 
         await copy('src', 'dist', {
             filter: (src) => {

@@ -8,6 +8,14 @@ import { applyFill, createSimulatedOrder, openOrder, rejectOrder, scheduleOrderF
 import { SimulationConfig, createSimulationConfig } from './simulation_config';
 import { WalletValidator } from './wallet_validator';
 
+export interface SimulationTradeExecutorParams {
+    initialWallet: WalletBalance;
+    baseToken: string;
+    exchangeSettings: ExchangeSettings;
+    initialPrices: Record<string, number>;
+    config?: Partial<SimulationConfig>;
+}
+
 /**
  * Simulation trade executor. Provides trade function implementations for simulation mode.
  */
@@ -18,20 +26,15 @@ export class SimulationTradeExecutor {
     private walletValidator: WalletValidator;
     private orderProcessor: OrderProcessor;
     private baseToken: string;
+    private currentDate: Date = new Date();
 
-    constructor(
-        initialWallet: WalletBalance,
-        baseToken: string,
-        exchangeSettings: ExchangeSettings,
-        initialPrices: Record<string, number>,
-        config?: Partial<SimulationConfig>
-    ) {
-        this.config = createSimulationConfig(config);
-        this.baseToken = baseToken;
+    constructor(params: SimulationTradeExecutorParams) {
+        this.config = createSimulationConfig(params.config);
+        this.baseToken = params.baseToken;
 
         this.orderBook = new OrderBook();
-        this.priceOracle = new PriceOracle(initialPrices, this.config.priceVolatility, this.config.randomSeed);
-        this.walletValidator = new WalletValidator(initialWallet, baseToken, exchangeSettings);
+        this.priceOracle = new PriceOracle(params.initialPrices, this.config.priceVolatility, this.config.randomSeed);
+        this.walletValidator = new WalletValidator(params.initialWallet, params.baseToken, params.exchangeSettings);
         this.orderProcessor = new OrderProcessor(this.config, this.orderBook, this.priceOracle, this.walletValidator);
     }
 
@@ -78,7 +81,8 @@ export class SimulationTradeExecutor {
             options.orderType,
             options.limitPrice,
             options.leverage || 1,
-            options.isFutures || false
+            options.isFutures || false,
+            this.currentDate.getTime()
         );
 
         this.orderBook.addOrder(order);
@@ -92,7 +96,7 @@ export class SimulationTradeExecutor {
             const executionPrice = this.priceOracle.getExecutionPrice(token, 'buy', this.config.slippagePercentage || 0);
 
             if (!executionPrice) {
-                updatedOrder = rejectOrder(order, `No price available for ${token}`);
+                updatedOrder = rejectOrder(order, `No price available for ${token}`, this.currentDate.getTime());
                 this.orderBook.updateOrder(updatedOrder);
 
                 return {
@@ -101,7 +105,7 @@ export class SimulationTradeExecutor {
                 };
             }
 
-            updatedOrder = applyFill(order, amount, executionPrice);
+            updatedOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             this.walletValidator.executeBuy(token, amount, executionPrice, options.leverage || 1);
@@ -120,11 +124,11 @@ export class SimulationTradeExecutor {
                 requestedPrice: options.limitPrice,
                 executionPrice,
                 slippage,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         } else if (this.config.orderFillStrategy === 'delayed') {
-            const fillTime = Date.now() + (this.config.fillDelayMs || 0);
-            updatedOrder = scheduleOrderFill(order, fillTime);
+            const fillTime = this.currentDate.getTime() + (this.config.fillDelayMs || 0);
+            updatedOrder = scheduleOrderFill(order, fillTime, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             return {
@@ -135,10 +139,10 @@ export class SimulationTradeExecutor {
                 filledAmount: 0,
                 remainingAmount: amount,
                 requestedPrice: options.limitPrice,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         } else {
-            updatedOrder = openOrder(order);
+            updatedOrder = openOrder(order, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             return {
@@ -181,7 +185,8 @@ export class SimulationTradeExecutor {
             options.orderType,
             options.limitPrice,
             options.leverage || 1,
-            options.isFutures || false
+            options.isFutures || false,
+            this.currentDate.getTime()
         );
 
         this.orderBook.addOrder(order);
@@ -194,7 +199,7 @@ export class SimulationTradeExecutor {
             const executionPrice = this.priceOracle.getExecutionPrice(token, 'sell', this.config.slippagePercentage || 0);
 
             if (!executionPrice) {
-                updatedOrder = rejectOrder(order, `No price available for ${token}`);
+                updatedOrder = rejectOrder(order, `No price available for ${token}`, this.currentDate.getTime());
                 this.orderBook.updateOrder(updatedOrder);
 
                 return {
@@ -203,7 +208,7 @@ export class SimulationTradeExecutor {
                 };
             }
 
-            updatedOrder = applyFill(order, amount, executionPrice);
+            updatedOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             this.walletValidator.executeSell(token, amount, executionPrice);
@@ -226,7 +231,7 @@ export class SimulationTradeExecutor {
             };
         } else if (this.config.orderFillStrategy === 'delayed') {
             const fillTime = Date.now() + (this.config.fillDelayMs || 0);
-            updatedOrder = scheduleOrderFill(order, fillTime);
+            updatedOrder = scheduleOrderFill(order, fillTime, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             return {
@@ -240,7 +245,7 @@ export class SimulationTradeExecutor {
                 timestamp: Date.now()
             };
         } else {
-            updatedOrder = openOrder(order);
+            updatedOrder = openOrder(order, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
             return {
@@ -299,8 +304,12 @@ export class SimulationTradeExecutor {
         this.priceOracle.updatePrice(token, price);
     }
 
+    updateCurrentDate(date: Date): void {
+        this.currentDate = date;
+    }
+
     processOrders(): void {
-        this.orderProcessor.processOrders();
+        this.orderProcessor.processOrders(this.currentDate);
     }
 
     getWallet(): WalletBalance {
