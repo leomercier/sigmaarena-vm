@@ -28,10 +28,12 @@ export class SimulationTradeExecutor {
     private orderProcessor: OrderProcessor;
     private baseToken: string;
     private currentDate: Date = new Date();
+    private reportGenerator: TradeReportGenerator;
 
     constructor(params: SimulationTradeExecutorParams) {
         this.config = createSimulationConfig(params.config);
         this.baseToken = params.baseToken;
+        this.reportGenerator = new TradeReportGenerator(this.baseToken, params.initialWallet, params.initialPrices);
 
         this.orderBook = new OrderBook();
         this.priceOracle = new PriceOracle(params.initialPrices, this.config.priceVolatility, this.config.randomSeed);
@@ -100,10 +102,19 @@ export class SimulationTradeExecutor {
                 };
             }
 
+            const walletBefore = this.walletValidator.getWallet();
+            const positionsBefore = new Map(this.walletValidator.getPositions());
+
             updatedOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
-            this.walletValidator.executeBuy(token, amount, executionPrice, options.leverage || 1);
+            this.walletValidator.executeBuy(token, amount, executionPrice, options.leverage || 1, options.isFutures || false);
+
+            const walletAfter = this.walletValidator.getWallet();
+            const positionsAfter = this.walletValidator.getPositions();
+
+            const tradeRecord = this.orderToTradeRecord(updatedOrder);
+            this.reportGenerator.recordTrade(tradeRecord, walletBefore, walletAfter, positionsBefore, positionsAfter);
 
             const slippage = options.limitPrice
                 ? Math.abs((executionPrice - options.limitPrice) / options.limitPrice)
@@ -204,10 +215,19 @@ export class SimulationTradeExecutor {
                 };
             }
 
+            const walletBefore = this.walletValidator.getWallet();
+            const positionsBefore = new Map(this.walletValidator.getPositions());
+
             updatedOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
-            this.walletValidator.executeSell(token, amount, executionPrice);
+            this.walletValidator.executeSell(token, amount, executionPrice, options.leverage || 1, options.isFutures || false);
+
+            const walletAfter = this.walletValidator.getWallet();
+            const positionsAfter = this.walletValidator.getPositions();
+
+            const tradeRecord = this.orderToTradeRecord(updatedOrder);
+            this.reportGenerator.recordTrade(tradeRecord, walletBefore, walletAfter, positionsBefore, positionsAfter);
 
             const slippage = options.limitPrice
                 ? Math.abs((executionPrice - options.limitPrice) / options.limitPrice)
@@ -287,6 +307,31 @@ export class SimulationTradeExecutor {
         };
     }
 
+    private orderToTradeRecord(order: SimulatedOrder): TradeRecord {
+        let slippage: number | undefined;
+        if (order.requestedPrice && order.executionPrice) {
+            slippage = Math.abs((order.executionPrice - order.requestedPrice) / order.requestedPrice);
+        }
+
+        return {
+            id: order.id,
+            timestamp: order.timestamp,
+            action: order.action,
+            token: order.token,
+            requestedAmount: order.requestedAmount,
+            filledAmount: order.filledAmount,
+            requestedPrice: order.requestedPrice,
+            executionPrice: order.executionPrice!,
+            leverage: order.leverage,
+            isFutures: order.isFutures,
+            slippage
+        };
+    }
+
+    closeAllPositions(finalPrices: Record<string, number>): void {
+        this.walletValidator.closeAllPositions(finalPrices);
+    }
+
     private async getCurrentPrice(token: string): Promise<PriceResult> {
         return this.priceOracle.getCurrentPrice(token);
     }
@@ -298,6 +343,7 @@ export class SimulationTradeExecutor {
 
     updatePrice(token: string, price: number): void {
         this.priceOracle.updatePrice(token, price);
+        this.reportGenerator.updatePrice(token, price);
     }
 
     updateCurrentDate(date: Date): void {
@@ -318,5 +364,9 @@ export class SimulationTradeExecutor {
 
     getOrderBook(): OrderBook {
         return this.orderBook;
+    }
+
+    getReportGenerator(): TradeReportGenerator {
+        return this.reportGenerator;
     }
 }

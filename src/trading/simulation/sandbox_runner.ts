@@ -40,6 +40,7 @@ export class SimulationRunner {
             'simulation/wallet_validator.ts': fs.readFileSync(join(__dirname, './wallet_validator.ts'), 'utf-8'),
             'simulation/simulation_config.ts': fs.readFileSync(join(__dirname, './simulation_config.ts'), 'utf-8'),
             'simulation/simulated_order.ts': fs.readFileSync(join(__dirname, './simulated_order.ts'), 'utf-8'),
+            'reporting/trade_report_generator.ts': fs.readFileSync(join(__dirname, '../reporting/trade_report_generator.ts'), 'utf-8'),
             'types.ts': fs.readFileSync(join(__dirname, '../types.ts'), 'utf-8'),
             'trading_class.ts': fs.readFileSync(join(__dirname, '../trading_class.ts'), 'utf-8'),
             'trade_functions.ts': fs.readFileSync(join(__dirname, '../trade_functions.ts'), 'utf-8'),
@@ -115,8 +116,19 @@ async function runStrategyInSandbox() {
     // const ohlcvData: OHLCVData[] = JSON.parse(fs.readFileSync(join('./ohlcv_data.json'), 'utf-8'));
 
     const result = await SimulationRunner.runSimulation(strategyCode, tradingConfig, simulationConfig, ohlcvData);
+    result.result?.trades?.forEach((trade: Record<string, any>) => {
+        trade.timestamp = new Date(trade.timestamp).toISOString();
+    });
+
+    const report = result.result?.report;
+    if (report) {
+        fs.writeFileSync(join('./trade_report.md'), report);
+        delete result.result.report;
+    }
 
     console.log('Simulation result', JSON.stringify(result, null, 4));
+    console.log('Trades count', result.result?.trades?.length || 0);
+    console.log('Futures trades count', result.result?.trades?.filter((t: any) => t.isFutures).length || 0);
 }
 
 runStrategyInSandbox()
