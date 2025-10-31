@@ -1,3 +1,5 @@
 .env
 dist
 ohlcv_data.json
+trade_report.md
+trade_report.csv

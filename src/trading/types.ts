@@ -87,4 +87,6 @@ export interface PnLResult {
     pnlPercentage: number;
 
     trades: TradeRecord[];
+
+    report?: string;
 }
