@@ -1,4 +1,6 @@
 import { OrderStatus, OrderType } from '../trade_functions';
+import { WalletBalance } from '../types';
+import { Position } from './wallet_validator';
 
 /**
  * Internal order state for simulation

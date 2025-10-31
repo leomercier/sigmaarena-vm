@@ -1,6 +1,5 @@
 import fs from 'fs';
 import { join } from 'path';
-import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SandboxManager, SandboxResult } from '../../sandbox/manager';
 import { delays } from '../../utils/delays';
@@ -80,7 +79,7 @@ export class SimulationRunner {
 }
 
 async function runStrategyInSandbox() {
-    const strategyCode = fs.readFileSync(join(__dirname, '../strategies/mock_strategy.ts'), 'utf-8');
+    const strategyCode = fs.readFileSync(join(__dirname, '../strategies/rsi.ts'), 'utf-8');
     const tradingConfig: TradingConfig = {
         walletBalance: { USDC: 10000, BTC: 0, ETH: 0 },
         baseToken: 'USDC',
@@ -98,7 +97,7 @@ async function runStrategyInSandbox() {
     };
 
     const timeTo = new Date();
-    const timeFrom = new Date(timeTo.getTime() - 10 * delays.oneDay);
+    const timeFrom = new Date(timeTo.getTime() - 20 * delays.oneDay);
 
     const ohlcvInputData: OHLCVExchangeInputData = {
         exchangeId: 'mexc',

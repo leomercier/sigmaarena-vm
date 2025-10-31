@@ -1,11 +1,12 @@
 import { v4 as uuidv4 } from 'uuid';
+import { TradeReportGenerator } from '../reporting/trade_report_generator';
 import { OrderStatusResult, PriceResult, TradeFunctions, TradeOptions, TradeResult } from '../trade_functions';
-import { ExchangeSettings, WalletBalance } from '../types';
+import { ExchangeSettings, TradeRecord, WalletBalance } from '../types';
 import { OrderBook } from './order_book';
 import { OrderProcessor } from './order_processor';
 import { PriceOracle } from './price_oracle';
-import { applyFill, createSimulatedOrder, openOrder, rejectOrder, scheduleOrderFill } from './simulated_order';
-import { SimulationConfig, createSimulationConfig } from './simulation_config';
+import { applyFill, createSimulatedOrder, openOrder, rejectOrder, scheduleOrderFill, SimulatedOrder } from './simulated_order';
+import { createSimulationConfig, SimulationConfig } from './simulation_config';
 import { WalletValidator } from './wallet_validator';
 
 export interface SimulationTradeExecutorParams {
@@ -48,13 +49,8 @@ export class SimulationTradeExecutor {
     }
 
     private async buy(token: string, amount: number, options: TradeOptions): Promise<TradeResult> {
-        const validation = this.walletValidator.canBuy(
-            token,
-            amount,
-            this.getCurrentPriceValue(token) || 0,
-            options.leverage || 1,
-            options.isFutures || false
-        );
+        const price = options.limitPrice || this.getCurrentPriceValue(token) || 0;
+        const validation = this.walletValidator.canBuy(token, amount, price, options.leverage || 1, options.isFutures || false);
 
         if (!validation.valid) {
             return {
@@ -87,8 +83,7 @@ export class SimulationTradeExecutor {
 
         this.orderBook.addOrder(order);
 
-        const price = options.limitPrice || this.getCurrentPriceValue(token) || 0;
-        this.walletValidator.commitForBuy(amount, price, options.leverage || 1);
+        this.walletValidator.commitForBuy(amount, price, options.leverage || 1, options.isFutures || false);
 
         let updatedOrder = order;
 
@@ -191,7 +186,8 @@ export class SimulationTradeExecutor {
 
         this.orderBook.addOrder(order);
 
-        this.walletValidator.commitForSell(token, amount);
+        const price = options.limitPrice || this.getCurrentPriceValue(token) || 0;
+        this.walletValidator.commitForSell(token, amount, price, options.leverage || 1, options.isFutures || false);
 
         let updatedOrder = order;
 

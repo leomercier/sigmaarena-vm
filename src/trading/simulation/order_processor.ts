@@ -41,7 +41,15 @@ export class OrderProcessor {
                 const cost = (order.remainingAmount * (order.requestedPrice || 0)) / order.leverage;
                 this.walletValidator.releaseCommitment(order.baseToken, cost);
             } else {
-                this.walletValidator.releaseCommitment(order.token, order.remainingAmount);
+                // For sell orders, need to check if it's futures or spot
+                if (order.isFutures) {
+                    // For futures, we may have committed margin
+                    const margin = (order.remainingAmount * (order.requestedPrice || 0)) / order.leverage;
+                    this.walletValidator.releaseCommitment(order.baseToken, margin);
+                } else {
+                    // For spot, release the actual tokens
+                    this.walletValidator.releaseCommitment(order.token, order.remainingAmount);
+                }
             }
 
             return;
@@ -102,15 +110,18 @@ export class OrderProcessor {
             return;
         }
 
+        const walletBefore = this.walletValidator.getWallet();
+        const positionsBefore = new Map(this.walletValidator.getPositions());
+
         // Apply the fill
         const updated = applyFill(order, fillAmount, executionPrice, currentDate);
         this.orderBook.updateOrder(updated);
 
         // Update wallet
         if (order.action === 'buy') {
-            this.walletValidator.executeBuy(order.token, fillAmount, executionPrice, order.leverage);
+            this.walletValidator.executeBuy(order.token, fillAmount, executionPrice, order.leverage, order.isFutures);
         } else {
-            this.walletValidator.executeSell(order.token, fillAmount, executionPrice);
+            this.walletValidator.executeSell(order.token, fillAmount, executionPrice, order.leverage, order.isFutures);
         }
     }
 

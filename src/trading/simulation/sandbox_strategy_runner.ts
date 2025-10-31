@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import path from 'path';
 import { Trading } from '../trading_class';
 import { OHLCVData, PnLResult, TradingConfig } from '../types';
 import { SimulationTradeExecutor, SimulationTradeExecutorParams } from './simulation_trade_executor';
@@ -50,6 +52,9 @@ export class SandboxStrategyRunner {
                 console.error('Error in strategy closeSession():', err);
             }
 
+            // Process orders one more time after closeSession in case the strategy placed closing trades
+            executor.processOrders();
+
             const finalPrices: Record<string, number> = {};
             for (const token of this.config.tradingConfig.tradableTokens) {
                 const lastOHLCV = [...ohlcvData].reverse().find((d) => d.symbol === token);
@@ -85,6 +90,8 @@ export class SandboxStrategyRunner {
         const initialWallet = this.config.tradingConfig.walletBalance;
         const baseToken = this.config.tradeExecutorParams.baseToken;
 
+        executor.closeAllPositions(finalPrices);
+
         const finalWallet = executor.getWallet();
         const trades = executor.getTradeRecords();
 
@@ -99,10 +106,13 @@ export class SandboxStrategyRunner {
 
         // Calculate final value
         let finalValue = finalWallet[baseToken] || 0;
+
+        // Check for any remaining token balances (shouldn't happen after closeAllPositions)
         for (const [token, amount] of Object.entries(finalWallet)) {
             if (token !== baseToken && amount > 0) {
                 const price = finalPrices[token] || 0;
                 finalValue += amount * price;
+                console.warn(`Warning: Found remaining ${token} balance after closing positions: ${amount}`);
             }
         }
 
