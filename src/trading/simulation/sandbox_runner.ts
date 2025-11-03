@@ -31,24 +31,31 @@ export class SimulationRunner {
             tradingConfig: tradingConfig
         };
 
+        const filePaths: Record<string, string> = {
+            'simulation/simulation_trade_executor.ts': './simulation_trade_executor.ts',
+            'simulation/sandbox_strategy_runner.ts': './sandbox_strategy_runner.ts',
+            'simulation/order_book.ts': './order_book.ts',
+            'simulation/price_oracle.ts': './price_oracle.ts',
+            'simulation/order_processor.ts': './order_processor.ts',
+            'simulation/wallet_validator.ts': './wallet_validator.ts',
+            'simulation/simulation_config.ts': './simulation_config.ts',
+            'simulation/simulated_order.ts': './simulated_order.ts',
+            'reporting/trade_report_generator.ts': '../reporting/trade_report_generator.ts',
+            'types.ts': '../types.ts',
+            'trading_class.ts': '../trading_class.ts',
+            'trade_functions.ts': '../trade_functions.ts'
+        };
+
         // Prepare files to inject into the sandbox
         const files: Record<string, string> = {
-            'simulation/simulation_trade_executor.ts': fs.readFileSync(join(__dirname, './simulation_trade_executor.ts'), 'utf-8'),
-            'simulation/sandbox_strategy_runner.ts': fs.readFileSync(join(__dirname, './sandbox_strategy_runner.ts'), 'utf-8'),
-            'simulation/order_book.ts': fs.readFileSync(join(__dirname, './order_book.ts'), 'utf-8'),
-            'simulation/price_oracle.ts': fs.readFileSync(join(__dirname, './price_oracle.ts'), 'utf-8'),
-            'simulation/order_processor.ts': fs.readFileSync(join(__dirname, './order_processor.ts'), 'utf-8'),
-            'simulation/wallet_validator.ts': fs.readFileSync(join(__dirname, './wallet_validator.ts'), 'utf-8'),
-            'simulation/simulation_config.ts': fs.readFileSync(join(__dirname, './simulation_config.ts'), 'utf-8'),
-            'simulation/simulated_order.ts': fs.readFileSync(join(__dirname, './simulated_order.ts'), 'utf-8'),
-            'reporting/trade_report_generator.ts': fs.readFileSync(join(__dirname, '../reporting/trade_report_generator.ts'), 'utf-8'),
-            'types.ts': fs.readFileSync(join(__dirname, '../types.ts'), 'utf-8'),
-            'trading_class.ts': fs.readFileSync(join(__dirname, '../trading_class.ts'), 'utf-8'),
-            'trade_functions.ts': fs.readFileSync(join(__dirname, '../trade_functions.ts'), 'utf-8'),
             'strategies/strategy.ts': strategyCode,
             'config.json': JSON.stringify(strategyRunnerConfig),
             'ohlcv_data.json': JSON.stringify(ohlcvData)
         };
+
+        for (const [destinationPath, sourcePath] of Object.entries(filePaths)) {
+            files[destinationPath] = readFile(sourcePath);
+        }
 
         const result = await sandboxManager.executeScript({
             script: `
@@ -78,6 +85,10 @@ export class SimulationRunner {
 
         return result;
     }
+}
+
+function readFile(filePath: string): string {
+    return fs.readFileSync(join(__dirname, filePath), 'utf-8');
 }
 
 export async function runStrategyInSandbox() {
@@ -111,10 +122,12 @@ export async function runStrategyInSandbox() {
         intervalType: '5m'
     };
 
-    const ohlcvData = await getExchangeTokenOHLCVs(ohlcvInputData);
-    fs.writeFileSync(join('./ohlcv_data.json'), JSON.stringify(ohlcvData, null, 4));
+    fs.mkdirSync(join('./results'), { recursive: true });
 
-    // const ohlcvData: OHLCVData[] = JSON.parse(fs.readFileSync(join('./ohlcv_data.json'), 'utf-8'));
+    const ohlcvData = await getExchangeTokenOHLCVs(ohlcvInputData);
+    fs.writeFileSync(join('./results/ohlcv_data.json'), JSON.stringify(ohlcvData, null, 4));
+
+    // const ohlcvData: OHLCVData[] = JSON.parse(fs.readFileSync(join('./results/ohlcv_data.json'), 'utf-8'));
 
     const result = await SimulationRunner.runSimulation(strategyCode, tradingConfig, simulationConfig, ohlcvData);
     result.result?.trades?.forEach((trade: Record<string, any>) => {
@@ -123,7 +136,6 @@ export async function runStrategyInSandbox() {
 
     const report = result.result?.report;
     if (report) {
-        fs.mkdirSync(join('./results'), { recursive: true });
         fs.writeFileSync(join('./results/trade_report.md'), report);
         delete result.result.report;
     }
