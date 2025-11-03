@@ -3,7 +3,7 @@ import { logError, logInfo } from '../utils/logging';
 import { SandboxManager } from './manager';
 import { FilteringProxy } from './proxy_server';
 
-function testProxy() {
+export function testProxy() {
     const proxy = new FilteringProxy({
         port: 8888,
         allowedDomains: ['api.github.com', 'github.com', 'www.googleapis.com']
@@ -17,7 +17,7 @@ function testProxy() {
     });
 }
 
-async function testManager() {
+export async function testManager() {
     const manager = new SandboxManager();
 
     try {

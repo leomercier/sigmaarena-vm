@@ -1,4 +1,3 @@
-import { OrderStatus } from '../trade_functions';
 import { TradeRecord } from '../types';
 import { SimulatedOrder } from './simulated_order';
 

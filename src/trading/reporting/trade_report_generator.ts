@@ -240,8 +240,6 @@ export class TradeReportGenerator {
             // Detect this case: no position before, position after, and no realized PnL
             if (!positionsBefore.get(trade.token) && positionsAfter.get(trade.token) && !realizedPnL) {
                 // Opening position - loss is only from slippage
-                // Calculate expected: margin used should equal what we paid
-                const expectedLoss = 0; // Ideally no loss when opening
                 // Any deviation from 0 is slippage/fees
                 actualGainLoss = liquidatedBalanceChange; // Show the actual change
             }
@@ -357,32 +355,6 @@ export class TradeReportGenerator {
         }
 
         this.reportEntries.push(entry);
-    }
-
-    /**
-     * Calculate liquidated balance - what the base token balance would be if all positions were closed
-     */
-    private calculateLiquidatedBalance(wallet: WalletBalance, positions: Map<string, any>): number {
-        let balance = wallet[this.baseToken] || 0;
-
-        // Add value from spot tokens
-        for (const [token, amount] of Object.entries(wallet)) {
-            if (token !== this.baseToken && amount > 0) {
-                const price = this.currentPrices.get(token) || 0;
-                balance += amount * price;
-            }
-        }
-
-        // Add margin locked in positions plus unrealized PnL
-        for (const [token, position] of positions) {
-            const currentPrice = this.currentPrices.get(token) || position.entryPrice;
-            const unrealizedPnL = position.amount * (currentPrice - position.entryPrice);
-
-            // Add back the margin locked in the position plus any unrealized gains/losses
-            balance += position.marginUsed + unrealizedPnL;
-        }
-
-        return balance;
     }
 
     /**

@@ -110,9 +110,6 @@ export class OrderProcessor {
             return;
         }
 
-        const walletBefore = this.walletValidator.getWallet();
-        const positionsBefore = new Map(this.walletValidator.getPositions());
-
         // Apply the fill
         const updated = applyFill(order, fillAmount, executionPrice, currentDate);
         this.orderBook.updateOrder(updated);
