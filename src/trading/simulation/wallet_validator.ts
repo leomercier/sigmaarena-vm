@@ -70,7 +70,7 @@ export class WalletValidator {
     getTotalUnrealizedPnL(currentPrices: Record<string, number>): number {
         let totalPnL = 0;
 
-        for (const [token, position] of this.positions) {
+        for (const [token] of this.positions) {
             const currentPrice = currentPrices[token];
             if (currentPrice !== undefined) {
                 totalPnL += this.getUnrealizedPnL(token, currentPrice);
