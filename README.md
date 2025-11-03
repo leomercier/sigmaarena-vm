@@ -3,12 +3,14 @@
 The SigmaArena Virtual Machine (VM) provides a sandboxed execution environment for evaluating on-chain and off-chain trading strategies before they are deployed into the SigmaArena competition. It bundles a deterministic simulation engine, strategy lifecycle helpers, and tooling to safely import user-authored TypeScript strategies with exchange-like trade functions.
 
 ## Highlights
+
 - **Deterministic simulation loop** with seeded order books, execution slippage modeling, and configurable market presets.
 - **Strategy authoring kit** that exposes typed trade functions (`buy`, `sell`, `getOrderStatus`, `getCurrentPrice`) and a `Trading` base class to streamline lifecycle management.
 - **Sandbox orchestration** that packages strategies, injects VM-provided helpers, and runs them in an isolated Docker image.
 - **Utility layer** for logging, delays, Slack notifications, and common config management.
 
 ## Project Layout
+
 - `src/trading/` – core trading abstractions, session management, and simulation runner/example strategy.
 - `src/sandbox/` – scripts for building and running the isolated execution environment, including Docker assets.
 - `src/config/` – configuration helpers for wiring strategies into the VM.
@@ -16,31 +18,41 @@ The SigmaArena Virtual Machine (VM) provides a sandboxed execution environment f
 - `src/index.ts` – entry point placeholder for future orchestration code.
 
 ## Getting Started
+
 1. **Prerequisites**: Node.js 20+ and Docker (for sandbox/image workflows).
 2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-   The `postinstall` hook builds the TypeScript sources into `dist/`.
+    ```bash
+    npm install
+    ```
+    The `postinstall` hook builds the TypeScript sources into `dist/`.
 3. **Run the base runtime**:
-   ```bash
-   npm start
-   ```
+    ```bash
+    npm start
+    ```
 4. **Explore the simulation example** (runs against the mock strategy):
-   ```bash
-   npx tsx src/trading/example_simulation_runner.ts
-   ```
+    ```bash
+    npx tsx src/trading/example_simulation_runner.ts
+    ```
 5. **Sandbox smoke test** (shows how external modules will be wired in production):
-   ```bash
-   npx tsx src/sandbox/example_usage.ts
-   ```
+    ```bash
+    npx tsx src/sandbox/example_usage.ts
+    ```
+
+## Usage
+
+- **Simulate a trade run**: execute the CLI through `npx` with a JSON config path and the strategy entry file you want to evaluate.
+    ```bash
+    EXCHANGE_MEXC=apiKey:xxxx|apiSecret:xxxx npx sigmaarena-vm simulate-trade src/commands/simulate-trade/config.json src/trading/strategies/rsi.ts
+    ```
 
 ## Developer Workflow
+
 - **Strategy authoring**: extend `src/trading/trading_class.ts` and expose a default instance in `src/trading/strategies/`.
 - **Simulation testing**: adjust presets in `src/trading/simulation/simulation_config.ts` to validate execution behavior and market dynamics.
 - **Sandbox iteration**: update the Docker assets under `src/sandbox/` and rebuild with `npm run build-sandbox-image`.
 
 ## Roadmap
+
 - Enable external TypeScript modules so third-party strategy bundles can be dynamically linked.
 - Create AI inference providers (via Chutes & Targon) that surface predictions and signals directly inside strategies.
 - Build historical price oracles for replaying archived market data sets.

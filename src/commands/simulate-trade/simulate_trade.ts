@@ -8,7 +8,7 @@ import { TradingConfig } from '../../trading/types';
 
 export async function simulateTrade(args: string[]) {
     if (args.length !== 2) {
-        console.error('Usage: npm run simulate-trade <config.json> <strategy.ts>');
+        console.error('Usage: npx sigmaarena-vm simulate-trade <config.json> <strategy.ts>');
         process.exit(1);
     }
 

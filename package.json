@@ -1,15 +1,19 @@
 {
-    "name": "bittensor-trading",
-    "version": "1.0.0",
-    "description": "Bittensor Trading",
-    "main": "index.js",
+    "name": "sigmaarena-vm",
+    "version": "1.0.2",
+    "description": "SigmaArena VM - SN127",
+    "main": "dist/index.js",
+    "bin": {
+        "sigmaarena-vm": "dist/index.js"
+    },
     "scripts": {
         "build": "tsc && node ./dist/utils/copy_files.js",
         "postinstall": "npm run build",
         "start": "node dist/index.js",
         "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest .",
         "cli": "ts-node src/index.ts",
-        "simulate-trade": "npm run cli simulate-trade"
+        "simulate-trade": "npm run cli simulate-trade",
+        "publish": "npm run build && npm publish --access public"
     },
     "keywords": [],
     "author": "",

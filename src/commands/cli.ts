@@ -26,7 +26,7 @@ export async function runCLI() {
 
 function printUsage() {
     console.log('Usage:');
-    console.log('  npm run <command> [args...]');
+    console.log('  npx sigmaarena-vm <command> [args...]');
     console.log('\nAvailable commands:');
 
     for (const name of Object.keys(commands)) {
