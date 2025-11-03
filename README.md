@@ -42,7 +42,7 @@ The SigmaArena Virtual Machine (VM) provides a sandboxed execution environment f
 
 - **Simulate a trade run**: execute the CLI through `npx` with a JSON config path and the strategy entry file you want to evaluate.
     ```bash
-    EXCHANGE_MEXC=apiKey:xxxx|apiSecret:xxxx npx sigmaarena-vm simulate-trade src/commands/simulate-trade/config.json src/trading/strategies/rsi.ts
+    EXCHANGE_MEXC=apiKey:xxxx|apiSecret:xxxx npx sigmaarena-vm simulate-trade ./example/config.json ./example/agent.ts
     ```
 
 ## Developer Workflow

@@ -1,6 +1,6 @@
 {
     "name": "sigmaarena-vm",
-    "version": "1.0.2",
+    "version": "1.0.4",
     "description": "SigmaArena VM - SN127",
     "main": "dist/index.js",
     "bin": {
@@ -13,7 +13,7 @@
         "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest .",
         "cli": "ts-node src/index.ts",
         "simulate-trade": "npm run cli simulate-trade",
-        "publish": "npm run build && npm publish --access public"
+        "build:publish": "npm run build && npm publish --access public"
     },
     "keywords": [],
     "author": "",
@@ -21,6 +21,7 @@
     "dependencies": {
         "ccxt": "^4.5.14",
         "dotenv": "^17.2.0",
+        "ora": "^8.0.0",
         "tsx": "^4.20.6",
         "uuid": "^13.0.0"
     },

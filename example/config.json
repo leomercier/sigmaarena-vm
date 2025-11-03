@@ -1,0 +1,30 @@
+{
+    "tradingConfig": {
+        "walletBalance": {
+            "USDC": 10000,
+            "BTC": 0,
+            "ETH": 0
+        },
+        "baseToken": "USDC",
+        "tradableTokens": ["BTCUSDC", "ETHUSDC"],
+        "exchangeSettings": {
+            "spotEnabled": true,
+            "futuresEnabled": true,
+            "spotLeverageOptions": [1, 2, 3],
+            "futuresLeverageOptions": [1, 2, 3, 4, 5, 10]
+        }
+    },
+    "simulationConfig": {
+        "orderFillStrategy": "immediate",
+        "slippagePercentage": 0.005
+    },
+    "exchangeConfig": {
+        "exchangeId": "mexc",
+        "exchangeType": "spot",
+        "address": "mexc-usdc",
+        "symbol": "ETHUSDC",
+        "timeFrom": "2025-10-20",
+        "timeTo": "2025-10-30",
+        "intervalType": "5m"
+    }
+}
