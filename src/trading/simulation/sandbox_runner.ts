@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { join } from 'path';
+import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SandboxManager, SandboxResult } from '../../sandbox/manager';
 import { delays } from '../../utils/delays';
@@ -79,7 +80,7 @@ export class SimulationRunner {
     }
 }
 
-async function runStrategyInSandbox() {
+export async function runStrategyInSandbox() {
     const strategyCode = fs.readFileSync(join(__dirname, '../strategies/rsi.ts'), 'utf-8');
     const tradingConfig: TradingConfig = {
         walletBalance: { USDC: 10000, BTC: 0, ETH: 0 },
@@ -122,7 +123,8 @@ async function runStrategyInSandbox() {
 
     const report = result.result?.report;
     if (report) {
-        fs.writeFileSync(join('./trade_report.md'), report);
+        fs.mkdirSync(join('./results'), { recursive: true });
+        fs.writeFileSync(join('./results/trade_report.md'), report);
         delete result.result.report;
     }
 
@@ -131,10 +133,10 @@ async function runStrategyInSandbox() {
     console.log('Futures trades count', result.result?.trades?.filter((t: any) => t.isFutures).length || 0);
 }
 
-runStrategyInSandbox()
-    .then(() => {
-        console.log('Strategy run completed');
-    })
-    .catch((err) => {
-        console.error('Error running strategy in sandbox:', err);
-    });
+// runStrategyInSandbox()
+//     .then(() => {
+//         console.log('Strategy run completed');
+//     })
+//     .catch((err) => {
+//         console.error('Error running strategy in sandbox:', err);
+//     });

@@ -121,7 +121,7 @@ async function runExamples() {
         );
 
     const results = await Promise.all(
-        concurrentScripts.map((script, i) =>
+        concurrentScripts.map((script, _i) =>
             manager.executeScript({
                 script,
                 timeoutMs: 25000

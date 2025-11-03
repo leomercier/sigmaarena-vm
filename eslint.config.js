@@ -20,7 +20,7 @@ export default [
         },
         rules: {
             // Show errors for unused variables
-            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+            '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_|ignoredErr' }],
             // Prettier integration
             'prettier/prettier': 'error'
         }

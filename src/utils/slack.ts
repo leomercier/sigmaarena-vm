@@ -1,6 +1,6 @@
 import config from '../config/config';
-import { logWarning } from './logging';
 import { getErrorMetadata } from './errors';
+import { logWarning } from './logging';
 
 const colors = {
     info: '#2eb886',

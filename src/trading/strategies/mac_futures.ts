@@ -158,17 +158,13 @@ class MovingAverageCrossover extends Trading {
         const trendStrength = Math.abs(shortMA - longMA) / longMA;
         const isStrongTrend = trendStrength >= this.macConfig.trendStrengthThreshold;
 
-        console.log(
-            `${symbol}: Price: ${currentPrice.toFixed(2)}, Short MA: ${shortMA.toFixed(2)}, Long MA: ${longMA.toFixed(2)}, Trend: ${(trendStrength * 100).toFixed(2)}%`
-        );
-
         // Execute trades based on signals
         if (goldenCross) {
             console.log(`🟢 ${symbol}: GOLDEN CROSS detected! Buy signal. Trend strength: ${(trendStrength * 100).toFixed(2)}%`);
             await this.executeBuy(symbol, currentPrice, isStrongTrend);
         } else if (deathCross) {
             console.log(`🔴 ${symbol}: DEATH CROSS detected! Sell signal. Trend strength: ${(trendStrength * 100).toFixed(2)}%`);
-            await this.executeSell(symbol, currentPrice);
+            await this.executeSell(symbol);
         }
     }
 
@@ -232,7 +228,7 @@ class MovingAverageCrossover extends Trading {
     /**
      * Execute a sell order (closes both spot and futures positions)
      */
-    private async executeSell(token: string, currentPrice: number): Promise<void> {
+    private async executeSell(token: string): Promise<void> {
         const tokenBalance = this.getBalance(token, this.walletBalance);
 
         if (tokenBalance <= 0) {

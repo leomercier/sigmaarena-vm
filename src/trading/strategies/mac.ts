@@ -109,15 +109,13 @@ class MovingAverageCrossover extends Trading {
         const goldenCross = prevShortMA <= prevLongMA && shortMA > longMA;
         const deathCross = prevShortMA >= prevLongMA && shortMA < longMA;
 
-        // console.log(`${symbol}: Price: ${currentPrice.toFixed(2)}, Short MA: ${shortMA.toFixed(2)}, Long MA: ${longMA.toFixed(2)}`);
-
         // Execute trades based on signals
         if (goldenCross) {
             console.log(`🟢 ${symbol}: GOLDEN CROSS detected! Buy signal.`);
             await this.executeBuy(symbol, currentPrice);
         } else if (deathCross) {
             console.log(`🔴 ${symbol}: DEATH CROSS detected! Sell signal.`);
-            await this.executeSell(symbol, currentPrice);
+            await this.executeSell(symbol);
         }
     }
 
@@ -169,7 +167,7 @@ class MovingAverageCrossover extends Trading {
     /**
      * Execute a sell order
      */
-    private async executeSell(token: string, currentPrice: number): Promise<void> {
+    private async executeSell(token: string): Promise<void> {
         const tokenBalance = this.getBalance(token, this.walletBalance);
 
         if (tokenBalance <= 0) {

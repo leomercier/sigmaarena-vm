@@ -7,7 +7,9 @@
         "build": "tsc && node ./dist/utils/copy_files.js",
         "postinstall": "npm run build",
         "start": "node dist/index.js",
-        "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest ."
+        "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest .",
+        "cli": "ts-node src/index.ts",
+        "simulate-trade": "npm run cli simulate-trade"
     },
     "keywords": [],
     "author": "",

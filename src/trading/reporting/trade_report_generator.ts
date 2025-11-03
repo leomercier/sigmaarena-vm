@@ -486,7 +486,7 @@ export class TradeReportGenerator {
 
         switch (format) {
             case 'csv':
-                this.saveCSVReport(outputPath, summary);
+                this.saveCSVReport(outputPath);
                 break;
             case 'json':
                 this.saveJSONReport(outputPath, summary);
@@ -502,7 +502,7 @@ export class TradeReportGenerator {
     /**
      * Save report as CSV
      */
-    private saveCSVReport(outputPath: string, summary: TradeReportSummary): void {
+    private saveCSVReport(outputPath: string): void {
         const headers = [
             'Trade #',
             'Timestamp',

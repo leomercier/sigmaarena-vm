@@ -62,7 +62,7 @@ class RandomStrategy extends Trading {
         if (decision === 1) {
             await this.attemptBuy(symbol, currentPrice);
         } else if (decision === 2) {
-            await this.attemptSell(symbol, currentPrice);
+            await this.attemptSell(symbol);
         }
     }
 
@@ -115,7 +115,7 @@ class RandomStrategy extends Trading {
     /**
      * Attempt to sell tokens
      */
-    private async attemptSell(token: string, currentPrice: number): Promise<void> {
+    private async attemptSell(token: string): Promise<void> {
         const tokenBalance = this.getBalance(token, this.walletBalance);
 
         // Sell 10% of holdings

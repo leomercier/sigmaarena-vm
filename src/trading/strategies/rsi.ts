@@ -1,6 +1,6 @@
 import { BuyFunction, GetCurrentPriceFunction, GetOrderStatusFunction, SellFunction } from '../trade_functions';
 import { Trading } from '../trading_class';
-import { AnalysisData, OHLCVData, WalletBalance } from '../types';
+import { AnalysisData, WalletBalance } from '../types';
 
 // These will be injected by the session manager into the sandbox
 declare const buy: BuyFunction;
@@ -198,11 +198,6 @@ class RSIBollingerBandsStrategy extends Trading {
         // Analyze signals
         const signals = this.analyzeSignals(currentPrice, volume, rsi, bb, avgVolume);
 
-        // Log current state
-        console.log(
-            `${symbol}: Price: ${currentPrice.toFixed(2)} | RSI: ${rsi.toFixed(2)} | BB: [${bb.lower.toFixed(2)}, ${bb.middle.toFixed(2)}, ${bb.upper.toFixed(2)}] | Vol: ${volume.toFixed(0)} (Avg: ${avgVolume.toFixed(0)}) | Position: ${hasPosition ? 'YES' : 'NO'}`
-        );
-
         // Trading logic: Only buy if no position, only sell if we have a position
         if (!hasPosition && signals.buySignals >= 2) {
             const confidence = signals.buySignals / 3;
@@ -217,7 +212,7 @@ class RSIBollingerBandsStrategy extends Trading {
             console.log(
                 `   RSI: ${signals.rsiOverbought ? '✓' : '✗'} | BB: ${signals.aboveBB ? '✓' : '✗'} | Volume: ${signals.highVolume ? '✓' : '✗'}`
             );
-            await this.executeSell(symbol, currentPrice);
+            await this.executeSell(symbol);
         } else if (hasPosition) {
             // Also check for exit conditions even if full sell signals aren't met
             // Exit if RSI returns to neutral and price is above middle band (take profit)
@@ -227,10 +222,10 @@ class RSIBollingerBandsStrategy extends Trading {
 
             if (shouldTakeProfit) {
                 console.log(`💰 ${symbol}: Taking profit - RSI normalized (${rsi.toFixed(2)}) and price above middle BB`);
-                await this.executeSell(symbol, currentPrice);
+                await this.executeSell(symbol);
             } else if (shouldStopLoss) {
                 console.log(`🛑 ${symbol}: Stop loss - Extreme oversold continues (RSI: ${rsi.toFixed(2)})`);
-                await this.executeSell(symbol, currentPrice);
+                await this.executeSell(symbol);
             }
         }
     }
@@ -418,7 +413,7 @@ class RSIBollingerBandsStrategy extends Trading {
     /**
      * Execute sell order
      */
-    private async executeSell(token: string, currentPrice: number): Promise<void> {
+    private async executeSell(token: string): Promise<void> {
         const tokenBalance = this.getBalance(token, this.walletBalance);
 
         if (tokenBalance <= 0) {

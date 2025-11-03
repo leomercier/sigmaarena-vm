@@ -167,6 +167,7 @@ export class SandboxManager {
             this.runningContainers.delete(containerId);
             try {
                 rmSync(workDir, { recursive: true, force: true });
+                rmSync(join(process.cwd(), 'temp'), { recursive: true });
             } catch (err) {
                 logError('Cleanup error', getErrorMetadata(err as Error));
             }
@@ -180,11 +181,9 @@ export class SandboxManager {
             const container = spawn('docker', dockerArgs);
             this.runningContainers.set(containerId, container);
 
-            let stdout = '';
             let stderr = '';
 
             container.stdout?.on('data', (data) => {
-                stdout += data.toString();
                 console.log('[Container]', data.toString());
             });
 

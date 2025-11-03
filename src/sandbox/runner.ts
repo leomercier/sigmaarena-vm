@@ -33,7 +33,7 @@ async function executeUserScript(): Promise<void> {
                     console.log(`[Sandbox] Injected function: ${key}`);
                 }
             });
-        } catch (err) {
+        } catch (ignoredErr) {
             console.log('[Sandbox] No injected functions file found');
         }
 
