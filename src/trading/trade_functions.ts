@@ -2,11 +2,31 @@ export type OrderType = 'market' | 'limit';
 
 export type OrderStatus = 'pending' | 'open' | 'filled' | 'partial' | 'cancelled' | 'rejected';
 
+/**
+ * Stop-loss configuration
+ * Can be specified as a percentage below entry (e.g., 5 = 5% below entry) or as an absolute price
+ */
+export interface StopLossOption {
+    percentage?: number;
+    price?: number;
+}
+
+/**
+ * Profit target configuration
+ * Can be specified as a percentage above entry (e.g., 10 = 10% profit target) or as an absolute price
+ */
+export interface ProfitTargetOption {
+    percentage?: number;
+    price?: number;
+}
+
 export interface TradeOptions {
     orderType: OrderType;
     limitPrice?: number;
     leverage?: number;
     isFutures?: boolean;
+    stopLoss?: StopLossOption;
+    profitTarget?: ProfitTargetOption;
 }
 
 export interface TradeResult {
@@ -65,7 +85,7 @@ export interface PriceResult {
  *
  * @param token - Token symbol to buy
  * @param amount - Amount to buy
- * @param options - Trade options (order type, price, leverage, etc.)
+ * @param options - Trade options (order type, price, leverage, stop-loss, profit target, etc.)
  * @returns Trade result with order details
  */
 export type BuyFunction = (token: string, amount: number, options: TradeOptions) => Promise<TradeResult>;
@@ -75,7 +95,7 @@ export type BuyFunction = (token: string, amount: number, options: TradeOptions)
  *
  * @param token - Token symbol to sell
  * @param amount - Amount to sell
- * @param options - Trade options (order type, price, leverage, etc.)
+ * @param options - Trade options (order type, price, leverage, stop-loss, profit target, etc.)
  * @returns Trade result with order details
  */
 export type SellFunction = (token: string, amount: number, options: TradeOptions) => Promise<TradeResult>;

@@ -29,18 +29,17 @@ export class PriceOracle {
     private priceHistory: Map<string, PricePoint[]>;
     private volatility: number;
     private random: SeededRandom;
+    private currentDate: Date;
 
-    constructor(initialPrices: Record<string, number>, volatility: number = 0, randomSeed?: number) {
+    constructor(initialPrices: Record<string, number>, volatility: number = 0, currentDate: Date, randomSeed?: number) {
         this.prices = new Map();
         this.priceHistory = new Map();
         this.volatility = volatility;
-        this.random = new SeededRandom(randomSeed ?? Date.now());
-
-        // Initialize prices
-        const now = Date.now();
+        this.currentDate = currentDate;
+        this.random = new SeededRandom(randomSeed ?? this.currentDate.getTime());
 
         for (const [token, price] of Object.entries(initialPrices)) {
-            const pricePoint = { price, timestamp: now };
+            const pricePoint = { price, timestamp: this.currentDate.getTime() };
             this.prices.set(token, pricePoint);
             this.priceHistory.set(token, [pricePoint]);
         }
@@ -69,7 +68,7 @@ export class PriceOracle {
             price,
             bid: price * 0.9995, // Simulate bid / ask spread
             ask: price * 1.0005,
-            timestamp: Date.now()
+            timestamp: this.currentDate.getTime()
         };
     }
 
@@ -77,7 +76,7 @@ export class PriceOracle {
      * Update price for a token (e.g., from OHLCV data)
      */
     updatePrice(token: string, price: number): void {
-        const pricePoint = { price, timestamp: Date.now() };
+        const pricePoint = { price, timestamp: this.currentDate.getTime() };
         this.prices.set(token, pricePoint);
 
         // Add to history
@@ -156,5 +155,9 @@ export class PriceOracle {
         }
 
         return result;
+    }
+
+    updateCurrentDate(date: Date): void {
+        this.currentDate = date;
     }
 }

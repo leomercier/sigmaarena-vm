@@ -24,6 +24,7 @@ export class SimulationRunner {
             tradeExecutorParams: {
                 initialWallet: tradingConfig.walletBalance,
                 baseToken: tradingConfig.baseToken,
+                currentDate: new Date(ohlcvData[0].timestamp),
                 exchangeSettings: tradingConfig.exchangeSettings,
                 initialPrices: {},
                 config: simulationConfig

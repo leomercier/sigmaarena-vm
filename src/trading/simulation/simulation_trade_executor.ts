@@ -1,17 +1,19 @@
 import { v4 as uuidv4 } from 'uuid';
 import { TradeReportGenerator } from '../reporting/trade_report_generator';
-import { OrderStatusResult, PriceResult, TradeFunctions, TradeOptions, TradeResult } from '../trade_functions';
+import { OrderStatusResult, PriceResult, ProfitTargetOption, StopLossOption, TradeFunctions, TradeOptions, TradeResult } from '../trade_functions';
 import { ExchangeSettings, TradeRecord, WalletBalance } from '../types';
 import { OrderBook } from './order_book';
 import { OrderProcessor } from './order_processor';
+import { PositionMonitor, PositionTriggerEvent } from './position_monitor';
 import { PriceOracle } from './price_oracle';
 import { applyFill, createSimulatedOrder, openOrder, rejectOrder, scheduleOrderFill, SimulatedOrder } from './simulated_order';
 import { createSimulationConfig, SimulationConfig } from './simulation_config';
-import { WalletValidator } from './wallet_validator';
+import { ProfitTargetConfig, StopLossConfig, WalletValidator } from './wallet_validator';
 
 export interface SimulationTradeExecutorParams {
     initialWallet: WalletBalance;
     baseToken: string;
+    currentDate: Date;
     exchangeSettings: ExchangeSettings;
     initialPrices: Record<string, number>;
     config?: Partial<SimulationConfig>;
@@ -26,19 +28,26 @@ export class SimulationTradeExecutor {
     private priceOracle: PriceOracle;
     private walletValidator: WalletValidator;
     private orderProcessor: OrderProcessor;
+    private positionMonitor: PositionMonitor;
     private baseToken: string;
-    private currentDate: Date = new Date();
+    private currentDate: Date;
     private reportGenerator: TradeReportGenerator;
+    private triggeredPositions: PositionTriggerEvent[] = [];
 
     constructor(params: SimulationTradeExecutorParams) {
         this.config = createSimulationConfig(params.config);
         this.baseToken = params.baseToken;
+        this.currentDate = params.currentDate;
+
         this.reportGenerator = new TradeReportGenerator(this.baseToken, params.initialWallet, params.initialPrices);
 
         this.orderBook = new OrderBook();
-        this.priceOracle = new PriceOracle(params.initialPrices, this.config.priceVolatility, this.config.randomSeed);
+        this.priceOracle = new PriceOracle(params.initialPrices, this.config.priceVolatility, this.currentDate, this.config.randomSeed);
         this.walletValidator = new WalletValidator(params.initialWallet, params.baseToken, params.exchangeSettings);
         this.orderProcessor = new OrderProcessor(this.config, this.orderBook, this.priceOracle, this.walletValidator);
+        this.positionMonitor = new PositionMonitor(this.walletValidator, this.priceOracle, (event) => {
+            this.triggeredPositions.push(event);
+        });
     }
 
     getTradeFunctions(): TradeFunctions {
@@ -48,6 +57,34 @@ export class SimulationTradeExecutor {
             getOrderStatus: this.getOrderStatus.bind(this),
             getCurrentPrice: this.getCurrentPrice.bind(this)
         };
+    }
+
+    private parseStopLoss(stopLoss: StopLossOption | undefined): StopLossConfig | undefined {
+        if (!stopLoss) {
+            return undefined;
+        }
+
+        if (stopLoss.percentage !== undefined) {
+            return { type: 'percentage', value: stopLoss.percentage };
+        } else if (stopLoss.price !== undefined) {
+            return { type: 'price', value: stopLoss.price };
+        }
+
+        return undefined;
+    }
+
+    private parseProfitTarget(profitTarget: ProfitTargetOption | undefined): ProfitTargetConfig | undefined {
+        if (!profitTarget) {
+            return undefined;
+        }
+
+        if (profitTarget.percentage !== undefined) {
+            return { type: 'percentage', value: profitTarget.percentage };
+        } else if (profitTarget.price !== undefined) {
+            return { type: 'price', value: profitTarget.price };
+        }
+
+        return undefined;
     }
 
     private async buy(token: string, amount: number, options: TradeOptions): Promise<TradeResult> {
@@ -108,7 +145,19 @@ export class SimulationTradeExecutor {
             updatedOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
-            this.walletValidator.executeBuy(token, amount, executionPrice, options.leverage || 1, options.isFutures || false);
+            const stopLoss = this.parseStopLoss(options.stopLoss);
+            const profitTarget = this.parseProfitTarget(options.profitTarget);
+
+            this.walletValidator.executeBuy(
+                token,
+                amount,
+                executionPrice,
+                options.leverage || 1,
+                options.isFutures || false,
+                stopLoss,
+                profitTarget,
+                this.currentDate.getTime()
+            );
 
             const walletAfter = this.walletValidator.getWallet();
             const positionsAfter = this.walletValidator.getPositions();
@@ -159,7 +208,7 @@ export class SimulationTradeExecutor {
                 filledAmount: 0,
                 remainingAmount: amount,
                 requestedPrice: options.limitPrice,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         }
     }
@@ -243,10 +292,10 @@ export class SimulationTradeExecutor {
                 requestedPrice: options.limitPrice,
                 executionPrice,
                 slippage,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         } else if (this.config.orderFillStrategy === 'delayed') {
-            const fillTime = Date.now() + (this.config.fillDelayMs || 0);
+            const fillTime = this.currentDate.getTime() + (this.config.fillDelayMs || 0);
             updatedOrder = scheduleOrderFill(order, fillTime, this.currentDate.getTime());
             this.orderBook.updateOrder(updatedOrder);
 
@@ -258,7 +307,7 @@ export class SimulationTradeExecutor {
                 filledAmount: 0,
                 remainingAmount: amount,
                 requestedPrice: options.limitPrice,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         } else {
             updatedOrder = openOrder(order, this.currentDate.getTime());
@@ -272,7 +321,7 @@ export class SimulationTradeExecutor {
                 filledAmount: 0,
                 remainingAmount: amount,
                 requestedPrice: options.limitPrice,
-                timestamp: Date.now()
+                timestamp: this.currentDate.getTime()
             };
         }
     }
@@ -348,10 +397,75 @@ export class SimulationTradeExecutor {
 
     updateCurrentDate(date: Date): void {
         this.currentDate = date;
+        this.priceOracle.updateCurrentDate(date);
+        this.walletValidator.updateCurrentDate(date);
     }
 
+    /**
+     * Process orders and check for position triggers (stop-loss / profit-target)
+     */
     processOrders(): void {
         this.orderProcessor.processOrders(this.currentDate);
+
+        const triggeredEvents = this.positionMonitor.checkPositions(this.currentDate);
+
+        // Execute sell orders for triggered positions
+        for (const event of triggeredEvents) {
+            const position = this.walletValidator.getPosition(event.token);
+            if (position) {
+                this.executeAutomaticClose(event);
+            }
+        }
+    }
+
+    /**
+     * Execute automatic position close due to stop-loss or profit target
+     */
+    private async executeAutomaticClose(event: PositionTriggerEvent): Promise<void> {
+        const position = this.walletValidator.getPosition(event.token);
+        if (!position) {
+            return;
+        }
+
+        const isFutures = true; // Positions are tracked for futures only
+        const amount = Math.abs(position.amount);
+
+        const executionPrice = this.priceOracle.getExecutionPrice(event.token, 'sell', this.config.slippagePercentage || 0);
+
+        if (!executionPrice) {
+            console.error(`Cannot close position for ${event.token}: no price available`);
+            return;
+        }
+
+        const walletBefore = this.walletValidator.getWallet();
+        const positionsBefore = new Map(this.walletValidator.getPositions());
+
+        this.walletValidator.executeSell(event.token, amount, executionPrice, position.leverage, isFutures);
+
+        const walletAfter = this.walletValidator.getWallet();
+        const positionsAfter = this.walletValidator.getPositions();
+
+        const orderId = uuidv4();
+        const order = createSimulatedOrder(
+            orderId,
+            'sell',
+            event.token,
+            this.baseToken,
+            amount,
+            'market',
+            undefined,
+            position.leverage,
+            isFutures,
+            this.currentDate.getTime()
+        );
+
+        const filledOrder = applyFill(order, amount, executionPrice, this.currentDate.getTime());
+        this.orderBook.addOrder(filledOrder);
+
+        const tradeRecord = this.orderToTradeRecord(filledOrder);
+        this.reportGenerator.recordTrade(tradeRecord, walletBefore, walletAfter, positionsBefore, positionsAfter);
+
+        console.log(`Position closed automatically at ${executionPrice.toFixed(2)}`);
     }
 
     getWallet(): WalletBalance {
@@ -368,5 +482,13 @@ export class SimulationTradeExecutor {
 
     getReportGenerator(): TradeReportGenerator {
         return this.reportGenerator;
+    }
+
+    getPositionMonitor(): PositionMonitor {
+        return this.positionMonitor;
+    }
+
+    getTriggeredPositions(): PositionTriggerEvent[] {
+        return [...this.triggeredPositions];
     }
 }

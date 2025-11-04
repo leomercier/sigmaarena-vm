@@ -4,12 +4,25 @@ interface CommittedBalances {
     [token: string]: number;
 }
 
+export interface StopLossConfig {
+    type: 'percentage' | 'price';
+    value: number;
+}
+
+export interface ProfitTargetConfig {
+    type: 'percentage' | 'price';
+    value: number;
+}
+
 export interface Position {
     token: string;
     amount: number; // Positive for long, negative for short
     entryPrice: number;
     leverage: number;
     marginUsed: number;
+    stopLoss?: StopLossConfig;
+    profitTarget?: ProfitTargetConfig;
+    createdAt: number;
 }
 
 /**
@@ -21,6 +34,7 @@ export class WalletValidator {
     private baseToken: string;
     private exchangeSettings: ExchangeSettings;
     private positions: Map<string, Position>; // Track futures positions
+    private currentDate: Date = new Date();
 
     constructor(initialWallet: WalletBalance, baseToken: string, exchangeSettings: ExchangeSettings) {
         this.wallet = { ...initialWallet };
@@ -51,12 +65,18 @@ export class WalletValidator {
         return new Map(this.positions);
     }
 
+    getPosition(token: string): Position | undefined {
+        return this.positions.get(token);
+    }
+
     /**
      * Calculate unrealized PnL for a position
      */
     getUnrealizedPnL(token: string, currentPrice: number): number {
         const position = this.positions.get(token);
-        if (!position) return 0;
+        if (!position) {
+            return 0;
+        }
 
         const priceDiff = currentPrice - position.entryPrice;
         const pnl = position.amount * priceDiff;
@@ -78,6 +98,59 @@ export class WalletValidator {
         }
 
         return totalPnL;
+    }
+
+    /**
+     * Check if stop-loss or profit target is triggered
+     */
+    checkPositionTriggers(token: string, currentPrice: number): { stopLossTriggered: boolean; profitTargetTriggered: boolean } {
+        const position = this.positions.get(token);
+        if (!position) {
+            return { stopLossTriggered: false, profitTargetTriggered: false };
+        }
+
+        let stopLossTriggered = false;
+        let profitTargetTriggered = false;
+
+        const isLong = position.amount > 0;
+
+        // Check stop-loss
+        if (position.stopLoss) {
+            let stopPrice: number;
+
+            if (position.stopLoss.type === 'percentage') {
+                // For long: stop-loss is below entry price
+                // For short: stop-loss is above entry price
+                const percentageMove = position.stopLoss.value / 100;
+                stopPrice = isLong ? position.entryPrice * (1 - percentageMove) : position.entryPrice * (1 + percentageMove);
+            } else {
+                stopPrice = position.stopLoss.value;
+            }
+
+            // Long position: triggered if price drops below stop
+            // Short position: triggered if price rises above stop
+            stopLossTriggered = isLong ? currentPrice <= stopPrice : currentPrice >= stopPrice;
+        }
+
+        // Check profit target
+        if (position.profitTarget) {
+            let targetPrice: number;
+
+            if (position.profitTarget.type === 'percentage') {
+                // For long: profit target is above entry price
+                // For short: profit target is below entry price
+                const percentageMove = position.profitTarget.value / 100;
+                targetPrice = isLong ? position.entryPrice * (1 + percentageMove) : position.entryPrice * (1 - percentageMove);
+            } else {
+                targetPrice = position.profitTarget.value;
+            }
+
+            // Long position: triggered if price rises above target
+            // Short position: triggered if price drops below target
+            profitTargetTriggered = isLong ? currentPrice >= targetPrice : currentPrice <= targetPrice;
+        }
+
+        return { stopLossTriggered, profitTargetTriggered };
     }
 
     canBuy(token: string, amount: number, price: number, leverage: number, isFutures: boolean): { valid: boolean; reason?: string } {
@@ -204,9 +277,18 @@ export class WalletValidator {
     }
 
     /**
-     * Execute a buy (update wallet, release commitment)
+     * Execute a buy (update wallet, release commitment). Now accepts optional stop-loss and profit target
      */
-    executeBuy(token: string, amount: number, price: number, leverage: number, isFutures: boolean): void {
+    executeBuy(
+        token: string,
+        amount: number,
+        price: number,
+        leverage: number,
+        isFutures: boolean,
+        stopLoss?: StopLossConfig,
+        profitTarget?: ProfitTargetConfig,
+        timestamp?: number
+    ): void {
         const requiredCapital = (amount * price) / leverage;
 
         if (isFutures) {
@@ -244,7 +326,10 @@ export class WalletValidator {
                         amount: remainingBuy,
                         entryPrice: price,
                         leverage,
-                        marginUsed: margin
+                        marginUsed: margin,
+                        stopLoss,
+                        profitTarget,
+                        createdAt: timestamp || this.currentDate.getTime()
                     });
                 }
             } else if (existingPosition) {
@@ -259,6 +344,9 @@ export class WalletValidator {
                 existingPosition.amount = totalAmount;
                 existingPosition.entryPrice = avgEntry;
                 existingPosition.marginUsed = totalMargin;
+                // Update stop-loss and profit target if provided
+                if (stopLoss) existingPosition.stopLoss = stopLoss;
+                if (profitTarget) existingPosition.profitTarget = profitTarget;
             } else {
                 // Open new long position
                 this.wallet[this.baseToken] = (this.wallet[this.baseToken] || 0) - requiredCapital;
@@ -267,7 +355,10 @@ export class WalletValidator {
                     amount,
                     entryPrice: price,
                     leverage,
-                    marginUsed: requiredCapital
+                    marginUsed: requiredCapital,
+                    stopLoss,
+                    profitTarget,
+                    createdAt: timestamp || this.currentDate.getTime()
                 });
             }
 
@@ -324,7 +415,8 @@ export class WalletValidator {
                         amount: -remainingShort, // Negative for short
                         entryPrice: price,
                         leverage,
-                        marginUsed: margin
+                        marginUsed: margin,
+                        createdAt: this.currentDate.getTime()
                     });
                 }
             } else if (existingPosition) {
@@ -352,7 +444,8 @@ export class WalletValidator {
                     amount: -amount, // Negative for short
                     entryPrice: price,
                     leverage,
-                    marginUsed: margin
+                    marginUsed: margin,
+                    createdAt: this.currentDate.getTime()
                 });
             }
         } else {
@@ -390,5 +483,9 @@ export class WalletValidator {
         }
 
         this.positions.clear();
+    }
+
+    updateCurrentDate(date: Date): void {
+        this.currentDate = date;
     }
 }
