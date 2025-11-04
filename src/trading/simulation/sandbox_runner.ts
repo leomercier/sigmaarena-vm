@@ -39,6 +39,7 @@ export class SimulationRunner {
             'simulation/price_oracle.ts': './price_oracle.ts',
             'simulation/order_processor.ts': './order_processor.ts',
             'simulation/wallet_validator.ts': './wallet_validator.ts',
+            'simulation/position_monitor.ts': './position_monitor.ts',
             'simulation/simulation_config.ts': './simulation_config.ts',
             'simulation/simulated_order.ts': './simulated_order.ts',
             'reporting/trade_report_generator.ts': '../reporting/trade_report_generator.ts',

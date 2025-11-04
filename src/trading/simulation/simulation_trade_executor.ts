@@ -13,7 +13,7 @@ import { ProfitTargetConfig, StopLossConfig, WalletValidator } from './wallet_va
 export interface SimulationTradeExecutorParams {
     initialWallet: WalletBalance;
     baseToken: string;
-    currentDate: Date;
+    currentDate: Date | string;
     exchangeSettings: ExchangeSettings;
     initialPrices: Record<string, number>;
     config?: Partial<SimulationConfig>;
@@ -37,7 +37,7 @@ export class SimulationTradeExecutor {
     constructor(params: SimulationTradeExecutorParams) {
         this.config = createSimulationConfig(params.config);
         this.baseToken = params.baseToken;
-        this.currentDate = params.currentDate;
+        this.currentDate = new Date(params.currentDate);
 
         this.reportGenerator = new TradeReportGenerator(this.baseToken, params.initialWallet, params.initialPrices);
 
