@@ -102,10 +102,27 @@ export class SandboxStrategyRunner {
     private injectTradeFunctions(executor: SimulationTradeExecutor): void {
         const tradeFunctions = executor.getTradeFunctions();
 
+        // Core trading functions
         (global as any).buy = tradeFunctions.buy;
         (global as any).sell = tradeFunctions.sell;
         (global as any).getOrderStatus = tradeFunctions.getOrderStatus;
         (global as any).getCurrentPrice = tradeFunctions.getCurrentPrice;
+
+        // Position management functions
+        (global as any).getPosition = tradeFunctions.getPosition;
+        (global as any).getAllPositions = tradeFunctions.getAllPositions;
+        (global as any).closePosition = tradeFunctions.closePosition;
+
+        // Wallet query functions
+        (global as any).getAvailableBalance = tradeFunctions.getAvailableBalance;
+        (global as any).getWallet = tradeFunctions.getWallet;
+        (global as any).getPortfolio = tradeFunctions.getPortfolio;
+
+        // Order management functions
+        (global as any).getOpenOrders = tradeFunctions.getOpenOrders;
+
+        // Validation functions
+        (global as any).canTrade = tradeFunctions.canTrade;
     }
 
     private async loadStrategy(userFilename: string): Promise<any> {

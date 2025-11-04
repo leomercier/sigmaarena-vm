@@ -1,6 +1,18 @@
 import { v4 as uuidv4 } from 'uuid';
 import { TradeReportGenerator } from '../reporting/trade_report_generator';
-import { OrderStatusResult, PriceResult, ProfitTargetOption, StopLossOption, TradeFunctions, TradeOptions, TradeResult } from '../trade_functions';
+import {
+    OrderInfo,
+    OrderStatusResult,
+    PortfolioSummary,
+    PositionInfo,
+    PriceResult,
+    ProfitTargetOption,
+    StopLossOption,
+    TradeFunctions,
+    TradeOptions,
+    TradeResult,
+    WalletInfo
+} from '../trade_functions';
 import { ExchangeSettings, TradeRecord, WalletBalance } from '../types';
 import { OrderBook } from './order_book';
 import { OrderProcessor } from './order_processor';
@@ -20,7 +32,7 @@ export interface SimulationTradeExecutorParams {
 }
 
 /**
- * Simulation trade executor. Provides trade function implementations for simulation mode.
+ * Simulation trade executor with enhanced helper functions
  */
 export class SimulationTradeExecutor {
     private config: SimulationConfig;
@@ -52,11 +64,167 @@ export class SimulationTradeExecutor {
 
     getTradeFunctions(): TradeFunctions {
         return {
+            // Core trading
             buy: this.buy.bind(this),
             sell: this.sell.bind(this),
             getOrderStatus: this.getOrderStatus.bind(this),
-            getCurrentPrice: this.getCurrentPrice.bind(this)
+            getCurrentPrice: this.getCurrentPrice.bind(this),
+
+            // Position management
+            getPosition: this.getPosition.bind(this),
+            getAllPositions: this.getAllPositions.bind(this),
+            closePosition: this.closePosition.bind(this),
+
+            // Wallet queries
+            getAvailableBalance: this.getAvailableBalance.bind(this),
+            getWallet: this.getWalletInfo.bind(this),
+            getPortfolio: this.getPortfolio.bind(this),
+
+            // Order management
+            getOpenOrders: this.getOpenOrders.bind(this),
+
+            // Validation
+            canTrade: this.canTrade.bind(this)
         };
+    }
+
+    private async getPosition(token: string): Promise<PositionInfo | null> {
+        const position = this.walletValidator.getPosition(token);
+        if (!position) {
+            return null;
+        }
+
+        const priceResult = await this.getCurrentPrice(token);
+        const currentPrice = priceResult.success ? priceResult.price : undefined;
+
+        const unrealizedPnL = currentPrice ? this.walletValidator.getUnrealizedPnL(token, currentPrice) : undefined;
+        const unrealizedPnLPercentage = unrealizedPnL !== undefined ? (unrealizedPnL / position.marginUsed) * 100 : undefined;
+
+        return {
+            token: position.token,
+            amount: position.amount,
+            entryPrice: position.entryPrice,
+            currentPrice,
+            leverage: position.leverage,
+            marginUsed: position.marginUsed,
+            isLong: position.amount > 0,
+            isShort: position.amount < 0,
+            unrealizedPnL,
+            unrealizedPnLPercentage,
+            stopLoss: position.stopLoss,
+            profitTarget: position.profitTarget,
+            createdAt: position.createdAt
+        };
+    }
+
+    private async getAllPositions(): Promise<PositionInfo[]> {
+        const positions = this.walletValidator.getPositions();
+        const positionInfos: PositionInfo[] = [];
+
+        for (const [token] of positions) {
+            const info = await this.getPosition(token);
+            if (info) {
+                positionInfos.push(info);
+            }
+        }
+
+        return positionInfos;
+    }
+
+    private async closePosition(token: string): Promise<TradeResult> {
+        const position = this.walletValidator.getPosition(token);
+
+        if (!position) {
+            return {
+                success: false,
+                error: `No position found for ${token}`
+            };
+        }
+
+        const amount = Math.abs(position.amount);
+
+        return this.sell(token, amount, {
+            orderType: 'market',
+            leverage: position.leverage,
+            isFutures: true
+        });
+    }
+
+    private async getAvailableBalance(token?: string): Promise<number> {
+        const targetToken = token || this.baseToken;
+        return this.walletValidator.getAvailableBalance(targetToken);
+    }
+
+    private async getWalletInfo(): Promise<WalletInfo> {
+        return this.walletValidator.getWallet();
+    }
+
+    private async getPortfolio(): Promise<PortfolioSummary> {
+        const wallet = this.walletValidator.getWallet();
+        const positions = await this.getAllPositions();
+
+        const baseBalance = wallet[this.baseToken] || 0;
+
+        // Calculate total value (base balance + unrealized PnL)
+        let unrealizedPnL = 0;
+        let totalExposure = 0;
+
+        for (const position of positions) {
+            if (position.unrealizedPnL !== undefined) {
+                unrealizedPnL += position.unrealizedPnL;
+            }
+
+            // Exposure = position value * leverage
+            if (position.currentPrice) {
+                totalExposure += Math.abs(position.amount) * position.currentPrice;
+            }
+        }
+
+        const totalValue = baseBalance + unrealizedPnL;
+
+        return {
+            baseToken: this.baseToken,
+            baseBalance,
+            totalValue,
+            totalExposure,
+            positions,
+            unrealizedPnL,
+            positionCount: positions.length
+        };
+    }
+
+    private async getOpenOrders(token?: string): Promise<OrderInfo[]> {
+        const activeOrders = this.orderBook.getActiveOrders();
+
+        const orderInfos: OrderInfo[] = activeOrders
+            .filter((order) => !token || order.token === token)
+            .map((order) => ({
+                orderId: order.id,
+                token: order.token,
+                action: order.action,
+                status: order.status,
+                requestedAmount: order.requestedAmount,
+                filledAmount: order.filledAmount,
+                remainingAmount: order.remainingAmount,
+                executionPrice: order.executionPrice
+            }));
+
+        return orderInfos;
+    }
+
+    private async canTrade(
+        action: 'buy' | 'sell',
+        token: string,
+        amount: number,
+        price: number,
+        leverage: number = 1,
+        isFutures: boolean = false
+    ): Promise<{ valid: boolean; reason?: string }> {
+        if (action === 'buy') {
+            return this.walletValidator.canBuy(token, amount, price, leverage, isFutures);
+        }
+
+        return this.walletValidator.canSell(token, amount, isFutures);
     }
 
     private parseStopLoss(stopLoss: StopLossOption | undefined): StopLossConfig | undefined {
@@ -98,7 +266,6 @@ export class SimulationTradeExecutor {
             };
         }
 
-        // Check for order failure
         if (this.orderProcessor.shouldOrderFail(options.orderType)) {
             return {
                 success: false,
