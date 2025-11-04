@@ -1,7 +1,7 @@
-import fs, { mkdirSync } from 'fs';
-import path from 'path';
 import { createHash } from 'crypto';
+import fs, { mkdirSync } from 'fs';
 import ora from 'ora';
+import path from 'path';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SimulationRunner } from '../../trading/simulation/sandbox_runner';
@@ -33,13 +33,16 @@ export async function simulateTrade(args: string[]) {
     spinner.succeed('Configuration and strategy paths validated');
 
     spinner.start('Loading configuration and strategy source');
+
     let configContent: any;
     let strategyCode: string;
+
     try {
         configContent = JSON.parse(fs.readFileSync(resolvedConfigPath, 'utf8'));
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Failed to parse configuration JSON: ${message}`);
+
         process.exit(1);
     }
 
@@ -48,6 +51,7 @@ export async function simulateTrade(args: string[]) {
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Failed to read strategy file: ${message}`);
+
         process.exit(1);
     }
     spinner.succeed('Configuration and strategy loaded');
@@ -81,23 +85,28 @@ export async function simulateTrade(args: string[]) {
         timeTo: exchangeConfig.timeTo,
         config: path.resolve(resolvedConfigPath)
     });
+
     const cacheKey = createHash('sha256').update(cacheKeySeed).digest('hex').slice(0, 16);
     const cacheDir = path.join('./.cache', 'ohlcv');
     const cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
 
     spinner.start('Checking OHLCV cache');
+
     let ohlcvData;
     let cacheHit = false;
+
     if (fs.existsSync(cacheFilePath)) {
         try {
             const cachedPayload = fs.readFileSync(cacheFilePath, 'utf8');
             ohlcvData = JSON.parse(cachedPayload);
             cacheHit = true;
+
             const cachedCount = Array.isArray(ohlcvData) ? ohlcvData.length : 'cached';
             spinner.succeed(`Loaded OHLCV data from cache (${cachedCount} entries)`);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             spinner.fail(`Cache read failed, fetching fresh data: ${message}`);
+
             try {
                 fs.unlinkSync(cacheFilePath);
             } catch {
@@ -110,20 +119,25 @@ export async function simulateTrade(args: string[]) {
 
     if (!cacheHit) {
         spinner.start(`Fetching OHLCV data for ${ohlcvInputData.symbol} from ${ohlcvInputData.exchangeId}`);
+
         try {
             ohlcvData = await getExchangeTokenOHLCVs(ohlcvInputData);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             spinner.fail(`Failed to fetch OHLCV data: ${message}`);
+
             process.exit(1);
         }
+
         const candleCount = Array.isArray(ohlcvData) ? ohlcvData.length : 'requested';
         spinner.succeed(`Fetched ${candleCount} OHLCV entries`);
 
         spinner.start('Caching OHLCV dataset for future runs');
+
         try {
             mkdirSync(cacheDir, { recursive: true });
             fs.writeFileSync(cacheFilePath, JSON.stringify(ohlcvData));
+
             spinner.succeed('OHLCV dataset cached');
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
@@ -132,7 +146,9 @@ export async function simulateTrade(args: string[]) {
     }
 
     spinner.start('Running simulation with provided strategy');
+
     let result;
+
     try {
         result = await SimulationRunner.runSimulation(strategyCode, tradingConfig, simulationConfig, ohlcvData);
     } catch (err) {
@@ -171,6 +187,7 @@ export async function simulateTrade(args: string[]) {
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Failed to write simulation artifacts: ${message}`);
+
         process.exit(1);
     }
 
