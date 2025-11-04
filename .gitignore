@@ -2,3 +2,4 @@
 dist
 results
 node_modules
+.cache

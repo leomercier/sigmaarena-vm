@@ -1,12 +1,14 @@
 import fs, { mkdirSync } from 'fs';
 import path from 'path';
 import { createHash } from 'crypto';
-import ora from 'ora';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SimulationRunner } from '../../trading/simulation/sandbox_runner';
 import { SimulationConfig } from '../../trading/simulation/simulation_config';
 import { TradingConfig } from '../../trading/types';
+
+// Use runtime dynamic import so the CommonJS build can consume ESM-only dependencies like `ora`.
+const dynamicImport = new Function('specifier', 'return import(specifier);') as <T>(specifier: string) => Promise<T>;
 
 export async function simulateTrade(args: string[]) {
     if (args.length !== 2) {
@@ -14,7 +16,16 @@ export async function simulateTrade(args: string[]) {
         process.exit(1);
     }
 
-    const spinner = ora();
+    let oraFactory: (typeof import('ora'))['default'];
+    try {
+        oraFactory = (await dynamicImport<typeof import('ora')>('ora')).default;
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.error(`Failed to load CLI spinner dependency (ora): ${message}`);
+        process.exit(1);
+    }
+
+    const spinner = oraFactory();
 
     const [configPath, strategyPath] = args;
     const resolvedConfigPath = path.resolve(process.cwd(), configPath);
