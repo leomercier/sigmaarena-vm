@@ -12,7 +12,7 @@ export class BollingerBandsOutput extends IndicatorInput {
     middle!: number;
     upper!: number;
     lower!: number;
-    pb?: number;
+    pb!: number;
 }
 
 export class BollingerBands extends Indicator {
@@ -104,7 +104,8 @@ export class BollingerBands extends Indicator {
         return {
             upper,
             middle: sma,
-            lower
+            lower,
+            pb: (prices[prices.length - 1] - lower) / (upper - lower)
         };
     }
 }

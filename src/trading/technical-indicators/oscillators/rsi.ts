@@ -57,6 +57,38 @@ export class RSI extends Indicator {
     nextValue(price: number): number | undefined {
         return this.generator.next(price).value;
     }
+
+    static lastValue(prices: number[], period: number): number | undefined {
+        if (prices.length < period + 1) {
+            return undefined;
+        }
+
+        const changes: number[] = [];
+        for (let i = 1; i < prices.length; i++) {
+            changes.push(prices[i] - prices[i - 1]);
+        }
+
+        const recentChanges = changes.slice(-period);
+        let gains = 0;
+        let losses = 0;
+
+        for (const change of recentChanges) {
+            if (change > 0) gains += change;
+            else losses += Math.abs(change);
+        }
+
+        const avgGain = gains / period;
+        const avgLoss = losses / period;
+
+        if (avgLoss === 0) {
+            return 100;
+        }
+
+        const rs = avgGain / avgLoss;
+        const rsi = 100 - 100 / (1 + rs);
+
+        return rsi;
+    }
 }
 
 export function rsi(input: RSIInput): number[] {

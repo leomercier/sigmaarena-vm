@@ -1,5 +1,5 @@
-import { BollingerBands } from '../technical-indicators';
-import { BuyFunction, SellFunction, GetAllPositionsFunction, GetWalletFunction } from '../trade_functions';
+import { BollingerBands, RSI } from '../technical-indicators';
+import { BuyFunction, GetAllPositionsFunction, GetWalletFunction, SellFunction } from '../trade_functions';
 import { Trading } from '../trading_class';
 import { AnalysisData } from '../types';
 
@@ -64,8 +64,8 @@ export default class RSIBollingerStrategy extends Trading {
     }
 
     private calculateIndicators(prices: number[]): IndicatorValues | null {
-        const rsi = this.calculateRSI(prices, this.RSI_PERIOD);
-        if (rsi === null) return null;
+        const rsi = RSI.lastValue(prices, this.RSI_PERIOD);
+        if (rsi === undefined) return null;
 
         const bb = BollingerBands.lastValue(prices, this.BB_PERIOD, this.BB_STD_DEV);
         if (!bb) return null;
@@ -197,33 +197,5 @@ export default class RSIBollingerStrategy extends Trading {
         if (deviation > 2) return 'up';
         if (deviation < -2) return 'down';
         return 'neutral';
-    }
-
-    private calculateRSI(prices: number[], period: number): number | null {
-        if (prices.length < period + 1) return null;
-
-        const changes: number[] = [];
-        for (let i = 1; i < prices.length; i++) {
-            changes.push(prices[i] - prices[i - 1]);
-        }
-
-        const recentChanges = changes.slice(-period);
-        let gains = 0;
-        let losses = 0;
-
-        for (const change of recentChanges) {
-            if (change > 0) gains += change;
-            else losses += Math.abs(change);
-        }
-
-        const avgGain = gains / period;
-        const avgLoss = losses / period;
-
-        if (avgLoss === 0) return 100;
-
-        const rs = avgGain / avgLoss;
-        const rsi = 100 - 100 / (1 + rs);
-
-        return rsi;
     }
 }
