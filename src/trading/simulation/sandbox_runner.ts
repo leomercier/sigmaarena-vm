@@ -59,6 +59,9 @@ export class SimulationRunner {
             files[destinationPath] = readFile(sourcePath);
         }
 
+        const folders: Record<string, string> = {};
+        folders[join(__dirname, '../technical-indicators')] = 'technical-indicators';
+
         const result = await sandboxManager.executeScript({
             script: `
                 import { SandboxStrategyRunner } from './simulation/sandbox_strategy_runner';
@@ -75,6 +78,7 @@ export class SimulationRunner {
                 }
             `,
             files,
+            folders,
             injectedFunctions: {
                 logInfo: (message: string) => {
                     console.log('[INFO]', message);

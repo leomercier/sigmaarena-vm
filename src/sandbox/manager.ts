@@ -1,6 +1,7 @@
 import { ChildProcess, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { copy } from 'fs-extra';
 import { dirname, join } from 'path';
 import { delays } from '../utils/delays';
 import { getErrorMetadata } from '../utils/errors';
@@ -16,6 +17,7 @@ export interface SandboxConfig {
     allowedEndpoints?: string[];
     injectedFunctions?: Record<string, (...args: any[]) => any>;
     files?: Record<string, string>;
+    folders?: Record<string, string>;
 }
 
 export interface SandboxResult {
@@ -84,6 +86,16 @@ export class SandboxManager {
                 for (const [filename, content] of Object.entries(sandboxConfig.files)) {
                     mkdirSync(dirname(join(scriptsDir, filename)), { recursive: true });
                     writeFileSync(join(scriptsDir, filename), content);
+                }
+            }
+
+            // Write additional folders
+            if (sandboxConfig.folders) {
+                for (const [sourceFolder, destinationFolder] of Object.entries(sandboxConfig.folders)) {
+                    const destPath = join(scriptsDir, destinationFolder);
+                    mkdirSync(destPath, { recursive: true });
+
+                    await copy(sourceFolder, destPath);
                 }
             }
 
