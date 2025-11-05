@@ -1,3 +1,4 @@
+import { BollingerBands } from '../technical-indicators';
 import { BuyFunction, SellFunction, GetAllPositionsFunction, GetWalletFunction } from '../trade_functions';
 import { Trading } from '../trading_class';
 import { AnalysisData } from '../types';
@@ -66,7 +67,7 @@ export default class RSIBollingerStrategy extends Trading {
         const rsi = this.calculateRSI(prices, this.RSI_PERIOD);
         if (rsi === null) return null;
 
-        const bb = this.calculateBollingerBands(prices, this.BB_PERIOD, this.BB_STD_DEV);
+        const bb = BollingerBands.lastValue(prices, this.BB_PERIOD, this.BB_STD_DEV);
         if (!bb) return null;
 
         const trend = this.calculateTrend(prices, 50);
@@ -224,25 +225,5 @@ export default class RSIBollingerStrategy extends Trading {
         const rsi = 100 - 100 / (1 + rs);
 
         return rsi;
-    }
-
-    private calculateBollingerBands(prices: number[], period: number, stdDev: number): { upper: number; middle: number; lower: number } | null {
-        if (prices.length < period) return null;
-
-        const recentPrices = prices.slice(-period);
-        const sma = recentPrices.reduce((sum, price) => sum + price, 0) / period;
-
-        const squaredDiffs = recentPrices.map((price) => Math.pow(price - sma, 2));
-        const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / period;
-        const standardDeviation = Math.sqrt(variance);
-
-        const upper = sma + standardDeviation * stdDev;
-        const lower = sma - standardDeviation * stdDev;
-
-        return {
-            upper,
-            middle: sma,
-            lower
-        };
     }
 }

@@ -12,7 +12,7 @@ export class BollingerBandsOutput extends IndicatorInput {
     middle!: number;
     upper!: number;
     lower!: number;
-    pb!: number;
+    pb?: number;
 }
 
 export class BollingerBands extends Indicator {
@@ -86,6 +86,26 @@ export class BollingerBands extends Indicator {
 
     nextValue(price: number): BollingerBandsOutput | undefined {
         return this.generator.next(price).value;
+    }
+
+    static lastValue(prices: number[], period: number, stdDev: number): BollingerBandsOutput | null {
+        if (prices.length < period) return null;
+
+        const recentPrices = prices.slice(-period);
+        const sma = recentPrices.reduce((sum, price) => sum + price, 0) / period;
+
+        const squaredDiffs = recentPrices.map((price) => Math.pow(price - sma, 2));
+        const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / period;
+        const standardDeviation = Math.sqrt(variance);
+
+        const upper = sma + standardDeviation * stdDev;
+        const lower = sma - standardDeviation * stdDev;
+
+        return {
+            upper,
+            middle: sma,
+            lower
+        };
     }
 }
 
