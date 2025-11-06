@@ -1,0 +1,33 @@
+{
+    "models": {
+        "openai:gpt-4": {
+            "input": 0.03,
+            "output": 0.06
+        },
+        "openai:gpt-4-turbo": {
+            "input": 0.01,
+            "output": 0.03
+        },
+        "openai:gpt-3.5-turbo": {
+            "input": 0.0005,
+            "output": 0.0015
+        },
+        "anthropic:claude-opus-4": {
+            "input": 0.015,
+            "output": 0.075
+        },
+        "anthropic:claude-sonnet-4": {
+            "input": 0.003,
+            "output": 0.015
+        },
+        "anthropic:claude-sonnet-3.5": {
+            "input": 0.003,
+            "output": 0.015
+        },
+        "anthropic:claude-haiku-3.5": {
+            "input": 0.001,
+            "output": 0.005
+        }
+    },
+    "note": "Prices are in USD per 1000 tokens. Update this file when provider pricing changes."
+}
