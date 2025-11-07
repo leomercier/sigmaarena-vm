@@ -71,11 +71,7 @@ export interface ToolDefinition {
     name: string;
     description: string;
 
-    parameters: {
-        type: 'object';
-        properties: Record<string, any>;
-        required?: string[];
-    };
+    inputSchema: z.ZodObject<any>;
 
     execute: (args: Record<string, any>) => Promise<any>;
 }
@@ -150,12 +146,8 @@ export class ProxyError extends Error {
 }
 
 export class BudgetExceededError extends ProxyError {
-    constructor(sessionId: string, required: number, available: number) {
-        super(
-            `Budget exceeded for session ${sessionId}. Required: $${required.toFixed(4)}, Available: $${available.toFixed(4)}`,
-            402,
-            'BUDGET_EXCEEDED'
-        );
+    constructor(sessionId: string, available: number) {
+        super(`Budget exceeded for session ${sessionId}. Available: $${available.toFixed(4)}`, 402, 'BUDGET_EXCEEDED');
     }
 }
 
