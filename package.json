@@ -8,6 +8,7 @@
     },
     "scripts": {
         "build": "tsc && node ./dist/utils/copy_files.js",
+        "buildMain": "tsc && node ./dist/utils/copy_files.js",
         "postinstall": "npm run build",
         "start": "node dist/index.js",
         "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest .",
@@ -23,7 +24,8 @@
         "dotenv": "^17.2.0",
         "ora": "^8.0.0",
         "tsx": "^4.20.6",
-        "uuid": "^13.0.0"
+        "uuid": "^13.0.0",
+        "zod-to-json-schema": "^3.24.6"
     },
     "devDependencies": {
         "@types/fs-extra": "^11.0.4",
