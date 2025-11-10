@@ -150,7 +150,7 @@ export async function simulateTrade(args: string[]) {
     let result;
 
     try {
-        result = await SimulationRunner.runSimulation(strategyCode, tradingConfig, simulationConfig, ohlcvData);
+        result = await SimulationRunner.runSimulation({ strategyCode, tradingConfig, simulationConfig, ohlcvData });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Simulation failed: ${message}`);

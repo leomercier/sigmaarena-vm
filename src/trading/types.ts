@@ -20,6 +20,12 @@ export interface TradingConfig {
     exchangeSettings: ExchangeSettings;
 }
 
+export interface LLMConfig {
+    userId: string;
+    sessionId: string;
+    llmBaseUrl: string;
+}
+
 export interface OHLCVData {
     timestamp: number;
     open: number;

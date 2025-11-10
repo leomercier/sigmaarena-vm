@@ -8,6 +8,10 @@ interface Config {
 
     exchangeConfigs: Record<string, string>;
 
+    llmBaseUrl: string;
+
+    userId: string;
+
     developmentConfig: DevelopmentConfig;
 }
 
@@ -21,6 +25,10 @@ const config: Config = {
     slackChannel: process.env.SLACK_CHANNEL || '',
 
     exchangeConfigs: getExchangeConfigs(),
+
+    llmBaseUrl: process.env.LLM_BASE_URL || '',
+
+    userId: process.env.USER_ID || 'sigmaarena_vm_user',
 
     developmentConfig: {
         enabled: process.env.DEVELOPMENT_ENABLED === 'true',

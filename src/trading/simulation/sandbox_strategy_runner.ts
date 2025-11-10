@@ -1,12 +1,14 @@
 import { readFileSync } from 'fs';
 import path from 'path';
+import { getLLMFunctionsInstance } from '../llm_functions';
 import { Trading } from '../trading_class';
-import { OHLCVData, PnLResult, TradingConfig } from '../types';
+import { LLMConfig, OHLCVData, PnLResult, TradingConfig } from '../types';
 import { SimulationTradeExecutor, SimulationTradeExecutorParams } from './simulation_trade_executor';
 
 export interface SandboxStrategyRunnerConfig {
     tradeExecutorParams: SimulationTradeExecutorParams;
     tradingConfig: TradingConfig;
+    llmConfig: LLMConfig;
 }
 
 export class SandboxStrategyRunner {
@@ -20,6 +22,8 @@ export class SandboxStrategyRunner {
         try {
             const executor = new SimulationTradeExecutor(this.config.tradeExecutorParams);
             this.injectTradeFunctions(executor);
+
+            this.injectLLMFunctions(this.config.llmConfig);
 
             const strategyClass = await this.loadStrategy(userFilename);
             const strategy: Trading = new strategyClass();
@@ -123,6 +127,17 @@ export class SandboxStrategyRunner {
 
         // Validation functions
         (global as any).canTrade = tradeFunctions.canTrade;
+    }
+
+    private injectLLMFunctions(llmConfig: LLMConfig): void {
+        if (!llmConfig.llmBaseUrl || !llmConfig.userId || !llmConfig.sessionId) {
+            return;
+        }
+
+        const llmFunctionsInstance = getLLMFunctionsInstance(llmConfig.userId, llmConfig.sessionId, llmConfig.llmBaseUrl);
+
+        (global as any).generateText = llmFunctionsInstance.generateText.bind(llmFunctionsInstance);
+        (global as any).generateObject = llmFunctionsInstance.generateObject.bind(llmFunctionsInstance);
     }
 
     private async loadStrategy(userFilename: string): Promise<any> {

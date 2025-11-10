@@ -1,35 +1,48 @@
 import fs from 'fs';
 import { join } from 'path';
+import { v4 as uuid } from 'uuid';
+import config from '../../config/config';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SandboxManager, SandboxResult } from '../../sandbox/manager';
 import { delays } from '../../utils/delays';
-import { OHLCVData, TradingConfig } from '../types';
+import { LLMConfig, OHLCVData, TradingConfig } from '../types';
 import { SandboxStrategyRunnerConfig } from './sandbox_strategy_runner';
 import { SimulationConfig } from './simulation_config';
 
+export interface SimulationRunnerConfig {
+    strategyCode: string;
+    tradingConfig: TradingConfig;
+    simulationConfig: SimulationConfig;
+    ohlcvData: OHLCVData[];
+}
+
 export class SimulationRunner {
-    static async runSimulation(
-        strategyCode: string,
-        tradingConfig: TradingConfig,
-        simulationConfig: SimulationConfig,
-        ohlcvData: OHLCVData[]
-    ): Promise<SandboxResult> {
+    static async runSimulation(runnerConfig: SimulationRunnerConfig): Promise<SandboxResult> {
         const sandboxManager = new SandboxManager();
 
         await sandboxManager.initialize();
         await sandboxManager.buildImage();
 
+        const sessionId = uuid();
+        const llmConfig: LLMConfig = {
+            userId: config.userId || '',
+            sessionId: sessionId,
+            llmBaseUrl: config.llmBaseUrl || ''
+        };
+        await createSession(sessionId);
+
         const strategyRunnerConfig: SandboxStrategyRunnerConfig = {
             tradeExecutorParams: {
-                initialWallet: tradingConfig.walletBalance,
-                baseToken: tradingConfig.baseToken,
-                currentDate: new Date(ohlcvData[0].timestamp),
-                exchangeSettings: tradingConfig.exchangeSettings,
+                initialWallet: runnerConfig.tradingConfig.walletBalance,
+                baseToken: runnerConfig.tradingConfig.baseToken,
+                currentDate: new Date(runnerConfig.ohlcvData[0].timestamp),
+                exchangeSettings: runnerConfig.tradingConfig.exchangeSettings,
                 initialPrices: {},
-                config: simulationConfig
+                config: runnerConfig.simulationConfig
             },
-            tradingConfig: tradingConfig
+            tradingConfig: runnerConfig.tradingConfig,
+            llmConfig: llmConfig
         };
 
         const filePaths: Record<string, string> = {
@@ -45,14 +58,15 @@ export class SimulationRunner {
             'reporting/trade_report_generator.ts': '../reporting/trade_report_generator.ts',
             'types.ts': '../types.ts',
             'trading_class.ts': '../trading_class.ts',
-            'trade_functions.ts': '../trade_functions.ts'
+            'trade_functions.ts': '../trade_functions.ts',
+            'llm_functions.ts': '../llm_functions.ts'
         };
 
         // Prepare files to inject into the sandbox
         const files: Record<string, string> = {
-            'strategies/strategy.ts': strategyCode,
+            'strategies/strategy.ts': runnerConfig.strategyCode,
             'config.json': JSON.stringify(strategyRunnerConfig),
-            'ohlcv_data.json': JSON.stringify(ohlcvData)
+            'ohlcv_data.json': JSON.stringify(runnerConfig.ohlcvData)
         };
 
         for (const [destinationPath, sourcePath] of Object.entries(filePaths)) {
@@ -77,19 +91,41 @@ export class SimulationRunner {
                     return result;
                 }
             `,
+            allowedEndpoints: [config.llmBaseUrl],
             files,
-            folders,
-            injectedFunctions: {
-                logInfo: (message: string) => {
-                    console.log('[INFO]', message);
-                },
-                logError: (message: string) => {
-                    console.error('[ERROR]', message);
-                }
-            }
+            folders
         });
 
         return result;
+    }
+}
+
+async function createSession(sessionId: string): Promise<void> {
+    try {
+        if (!config.userId || !config.llmBaseUrl) {
+            return;
+        }
+
+        const body = {
+            userId: config.userId,
+            sessionId: sessionId
+        };
+
+        const baseUrl = config.llmBaseUrl.replace('host.docker.internal', 'localhost');
+        const resp = await fetch(`${baseUrl}/api/session`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!resp.ok) {
+            const errText = await resp.text().catch(() => '');
+            throw new Error(errText || `LLM request failed with status ${resp.status}`);
+        }
+    } catch (err) {
+        console.error('Error creating LLM session:', err);
     }
 }
 
@@ -98,7 +134,7 @@ function readFile(filePath: string): string {
 }
 
 export async function runStrategyInSandbox() {
-    const strategyCode = fs.readFileSync(join(__dirname, '../strategies/rsi.ts'), 'utf-8');
+    const strategyCode = fs.readFileSync(join(__dirname, '../strategies/rsi_v3.ts'), 'utf-8');
     const tradingConfig: TradingConfig = {
         walletBalance: { USDC: 10000, BTC: 0, ETH: 0 },
         baseToken: 'USDC',
@@ -135,7 +171,8 @@ export async function runStrategyInSandbox() {
 
     // const ohlcvData: OHLCVData[] = JSON.parse(fs.readFileSync(join('./results/ohlcv_data.json'), 'utf-8'));
 
-    const result = await SimulationRunner.runSimulation(strategyCode, tradingConfig, simulationConfig, ohlcvData);
+    const result = await SimulationRunner.runSimulation({ strategyCode, tradingConfig, simulationConfig, ohlcvData });
+
     result.result?.trades?.forEach((trade: Record<string, any>) => {
         trade.timestamp = new Date(trade.timestamp).toISOString();
     });
@@ -151,10 +188,12 @@ export async function runStrategyInSandbox() {
     console.log('Futures trades count', result.result?.trades?.filter((t: any) => t.isFutures).length || 0);
 }
 
-// runStrategyInSandbox()
-//     .then(() => {
-//         console.log('Strategy run completed');
-//     })
-//     .catch((err) => {
-//         console.error('Error running strategy in sandbox:', err);
-//     });
+if (require.main === module) {
+    runStrategyInSandbox()
+        .then(() => {
+            console.log('Strategy run completed');
+        })
+        .catch((err) => {
+            console.error('Error running strategy in sandbox:', err);
+        });
+}
