@@ -26,14 +26,6 @@ export function createRouter(): Router {
     const inferenceController = new InferenceController(sessionStore, costCalculator, usageTracker, toolRegistry);
     const usageController = new UsageController(sessionStore, usageTracker);
 
-    router.get('/status', (req, res) => {
-        res.status(200).json({
-            status: 'ok',
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime()
-        });
-    });
-
     // Session routes
     router.post('/session', sessionController.createSession.bind(sessionController));
     router.get('/session/:sessionId', sessionController.getSession.bind(sessionController));

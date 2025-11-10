@@ -36,7 +36,7 @@ export function startServer() {
             version: '1.0.0',
             status: 'running',
             endpoints: {
-                health: '/api/health',
+                status: '/status',
                 session: {
                     create: 'POST /api/session',
                     get: 'GET /api/session/:sessionId'
@@ -48,6 +48,14 @@ export function startServer() {
                     summary: 'GET /api/usage/summary'
                 }
             }
+        });
+    });
+
+    app.get('/status', (req: Request, res: Response) => {
+        res.status(200).json({
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            uptime: process.uptime()
         });
     });
 
@@ -99,7 +107,7 @@ export function startServer() {
         console.log('='.repeat(50));
 
         console.log(`API Documentation: http://localhost:${config.port}/`);
-        console.log(`Status Check: http://localhost:${config.port}/api/status`);
+        console.log(`Status Check: http://localhost:${config.port}/status`);
         console.log('='.repeat(50));
     });
 
