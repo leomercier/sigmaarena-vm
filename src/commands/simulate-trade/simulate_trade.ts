@@ -18,7 +18,7 @@ export async function simulateTrade(args: string[]) {
 
     const [configPath, strategyPath] = args;
     const resolvedConfigPath = path.resolve(process.cwd(), configPath);
-    const resolvedStrategyPath = path.resolve(process.cwd(), strategyPath);
+    const strategyFilename = path.resolve(process.cwd(), strategyPath);
 
     spinner.start('Validating configuration and strategy paths');
     if (!fs.existsSync(resolvedConfigPath)) {
@@ -26,8 +26,8 @@ export async function simulateTrade(args: string[]) {
         process.exit(1);
     }
 
-    if (!fs.existsSync(resolvedStrategyPath)) {
-        spinner.fail(`Strategy file not found: ${resolvedStrategyPath}`);
+    if (!fs.existsSync(strategyFilename)) {
+        spinner.fail(`Strategy file not found: ${strategyFilename}`);
         process.exit(1);
     }
     spinner.succeed('Configuration and strategy paths validated');
@@ -35,7 +35,6 @@ export async function simulateTrade(args: string[]) {
     spinner.start('Loading configuration and strategy source');
 
     let configContent: any;
-    let strategyCode: string;
 
     try {
         configContent = JSON.parse(fs.readFileSync(resolvedConfigPath, 'utf8'));
@@ -46,15 +45,7 @@ export async function simulateTrade(args: string[]) {
         process.exit(1);
     }
 
-    try {
-        strategyCode = fs.readFileSync(resolvedStrategyPath, 'utf8');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        spinner.fail(`Failed to read strategy file: ${message}`);
-
-        process.exit(1);
-    }
-    spinner.succeed('Configuration and strategy loaded');
+    spinner.succeed('Configuration loaded');
 
     if (!configContent.tradingConfig || !configContent.simulationConfig || !configContent.exchangeConfig) {
         spinner.fail('Config file must contain tradingConfig, simulationConfig, and exchangeConfig sections');
@@ -150,7 +141,7 @@ export async function simulateTrade(args: string[]) {
     let result;
 
     try {
-        result = await SimulationRunner.runSimulation({ strategyCode, tradingConfig, simulationConfig, ohlcvData });
+        result = await SimulationRunner.runSimulation({ strategyFilename, tradingConfig, simulationConfig, ohlcvData });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Simulation failed: ${message}`);

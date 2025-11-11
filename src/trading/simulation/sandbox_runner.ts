@@ -1,5 +1,5 @@
 import fs from 'fs';
-import { join } from 'path';
+import path, { join } from 'path';
 import { v4 as uuid } from 'uuid';
 import config from '../../config/config';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
@@ -11,7 +11,7 @@ import { SandboxStrategyRunnerConfig } from './sandbox_strategy_runner';
 import { SimulationConfig } from './simulation_config';
 
 export interface SimulationRunnerConfig {
-    strategyCode: string;
+    strategyFilename: string;
     tradingConfig: TradingConfig;
     simulationConfig: SimulationConfig;
     ohlcvData: OHLCVData[];
@@ -62,9 +62,11 @@ export class SimulationRunner {
             'llm_functions.ts': '../llm_functions.ts'
         };
 
+        const strategyCode = fs.readFileSync(runnerConfig.strategyFilename, 'utf-8');
+
         // Prepare files to inject into the sandbox
         const files: Record<string, string> = {
-            'strategies/strategy.ts': runnerConfig.strategyCode,
+            'strategies/strategy.ts': strategyCode,
             'config.json': JSON.stringify(strategyRunnerConfig),
             'ohlcv_data.json': JSON.stringify(runnerConfig.ohlcvData)
         };
@@ -75,6 +77,14 @@ export class SimulationRunner {
 
         const folders: Record<string, string> = {};
         folders[join(__dirname, '../technical-indicators')] = 'technical-indicators';
+
+        const strategiesFolder = path.dirname(runnerConfig.strategyFilename);
+        const strategyBaseFilename = path.basename(runnerConfig.strategyFilename, '.ts').replaceAll('_', '-');
+        const strategyFolder = join(strategiesFolder, strategyBaseFilename);
+
+        if (fs.existsSync(strategyFolder)) {
+            folders[strategyFolder] = path.join('strategies', strategyBaseFilename);
+        }
 
         const result = await sandboxManager.executeScript({
             script: `
@@ -134,7 +144,8 @@ function readFile(filePath: string): string {
 }
 
 export async function runStrategyInSandbox() {
-    const strategyCode = fs.readFileSync(join(__dirname, '../strategies/rsi_v3.ts'), 'utf-8');
+    const strategyFilename = join(__dirname, '../strategies/rsi_v3.ts');
+
     const tradingConfig: TradingConfig = {
         walletBalance: { USDC: 10000, BTC: 0, ETH: 0 },
         baseToken: 'USDC',
@@ -171,7 +182,7 @@ export async function runStrategyInSandbox() {
 
     // const ohlcvData: OHLCVData[] = JSON.parse(fs.readFileSync(join('./results/ohlcv_data.json'), 'utf-8'));
 
-    const result = await SimulationRunner.runSimulation({ strategyCode, tradingConfig, simulationConfig, ohlcvData });
+    const result = await SimulationRunner.runSimulation({ strategyFilename, tradingConfig, simulationConfig, ohlcvData });
 
     result.result?.trades?.forEach((trade: Record<string, any>) => {
         trade.timestamp = new Date(trade.timestamp).toISOString();

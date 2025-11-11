@@ -159,7 +159,7 @@ export class SandboxManager {
 
             dockerArgs.push(this.imageName);
 
-            await this.runContainer(containerId, dockerArgs, sandboxConfig.timeoutMs || delays.oneMinute);
+            await this.runContainer(containerId, dockerArgs, sandboxConfig.timeoutMs || delays.fiveMinutes);
 
             const resultPath = join(outputDir, 'result.json');
             const output = JSON.parse(readFileSync(resultPath, 'utf-8'));
