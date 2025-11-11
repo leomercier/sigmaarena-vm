@@ -1,7 +1,9 @@
 import { ChildProcess, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
+import path from 'path';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
+import fs from 'fs';
 import { delays } from '../utils/delays';
 import { getErrorMetadata } from '../utils/errors';
 import { logDebug, logError, logInfo } from '../utils/logging';
@@ -45,22 +47,54 @@ export class SandboxManager {
         }
     }
 
-    async buildImage(): Promise<void> {
+    getBaseDir(): 'src' | 'dist' {
+        let current = __dirname;
+        while (current !== path.parse(current).root) {
+            const dirName = path.basename(current);
+            if (dirName === 'src' || dirName === 'dist') return dirName as 'src' | 'dist';
+            current = path.dirname(current);
+        }
+        throw new Error('Cannot find src or dist parent');
+    }
+
+    buildImage(): Promise<void> {
+        const that = this;
         return new Promise((resolve, reject) => {
-            logDebug('Building Docker image ...');
+            const base = that.getBaseDir();
 
-            const build = spawn('docker', ['build', '-f', 'dist/sandbox/Dockerfile', '-t', this.imageName, '.']);
+            // Where your Dockerfiles live:
+            // dist mode: <pkg>/dist/sandbox/Dockerfile.npm with COPY /sandbox/...
+            // dev mode:  <repo>/sandbox/Dockerfile       with COPY sandbox/...
+            const dockerfile =
+                base === 'dist'
+                    ? path.resolve(__dirname, 'Dockerfile.npm') // <pkg>/dist/sandbox/Dockerfile.npm
+                    : path.resolve(__dirname, '../sandbox/Dockerfile'); // <repo>/src/** -> Dockerfile at <repo>/sandbox
 
-            build.stdout?.on('data', (data) => console.log(data.toString()));
-            build.stderr?.on('data', (data) => console.error(data.toString()));
+            // Context must match what the Dockerfile COPY paths expect
+            // Dockerfile.npm has "COPY /sandbox/..." so context must be <pkg>/dist
+            // Dev Dockerfile usually has "COPY sandbox/..." so context is repo root
+            const context =
+                base === 'dist'
+                    ? path.resolve(__dirname, '..') // <pkg>/dist
+                    : path.resolve(__dirname, '..', '..'); // <repo> root
+
+            // Sanity checks
+            if (!fs.existsSync(dockerfile)) {
+                return reject(new Error(`Dockerfile not found at ${dockerfile}`));
+            }
+            if (!fs.existsSync(context)) {
+                return reject(new Error(`Context not found at ${context}`));
+            }
+
+            console.log('Dockerfile:', dockerfile);
+            console.log('Context:', context);
+
+            const args = ['build', '-f', dockerfile, '-t', that.imageName, context];
+            const build = spawn('docker', args, { stdio: 'inherit' });
 
             build.on('close', (code) => {
-                if (code === 0) {
-                    logDebug('Image built successfully');
-                    resolve();
-                } else {
-                    reject(new Error(`Build failed with code ${code}`));
-                }
+                if (code === 0) resolve();
+                else reject(new Error(`Build failed with code ${code}`));
             });
         });
     }
