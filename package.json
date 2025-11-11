@@ -1,6 +1,6 @@
 {
     "name": "sigmaarena-vm",
-    "version": "1.0.4",
+    "version": "1.0.14",
     "description": "SigmaArena VM - SN127",
     "main": "dist/index.js",
     "bin": {
@@ -41,5 +41,9 @@
     },
     "engines": {
         "node": ">=20.0.0"
-    }
+    },
+    "files": [
+        "dist/**",
+        "dist/sandbox/Dockerfile"
+    ]
 }
