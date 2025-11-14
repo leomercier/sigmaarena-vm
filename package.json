@@ -1,6 +1,6 @@
 {
     "name": "sigmaarena-vm",
-    "version": "1.0.15",
+    "version": "1.0.16",
     "description": "SigmaArena VM - SN127",
     "main": "build/index.js",
     "bin": {
