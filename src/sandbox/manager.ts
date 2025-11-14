@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto';
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { copy } from 'fs-extra';
 import { dirname, join } from 'path';
+import { PnLResult } from '../trading/types';
 import { delays } from '../utils/delays';
 import { getErrorMetadata } from '../utils/errors';
 import { logDebug, logError, logInfo } from '../utils/logging';
@@ -22,10 +23,10 @@ export interface SandboxConfig {
 
 export interface SandboxResult {
     success: boolean;
-    result?: any;
-    error?: string;
     executionTime: number;
     containerId: string;
+    result?: PnLResult;
+    error?: string;
 }
 
 export class SandboxManager {
