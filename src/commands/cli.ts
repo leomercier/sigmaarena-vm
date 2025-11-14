@@ -1,6 +1,6 @@
 import { simulateTrade } from './simulate-trade/simulate_trade';
 
-type CommandHandler = (args: string[]) => void | Promise<void>;
+type CommandHandler = (args: string[]) => Promise<{ errorCode: number; result?: any }>;
 
 const commands: Record<string, CommandHandler> = {
     'simulate-trade': simulateTrade
@@ -21,7 +21,13 @@ export async function runCLI() {
         printUsage();
     }
 
-    await command(commandArgs);
+    const { errorCode, result } = await command(commandArgs);
+    if (result) {
+        console.log('Command results');
+        console.log(JSON.stringify(result, null, 4));
+    }
+
+    process.exit(errorCode);
 }
 
 function printUsage() {

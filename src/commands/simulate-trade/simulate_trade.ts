@@ -4,31 +4,35 @@ import ora from 'ora';
 import path from 'path';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
+import { SandboxResult } from '../../sandbox/manager';
 import { SimulationRunner } from '../../trading/simulation/sandbox_runner';
 import { SimulationConfig } from '../../trading/simulation/simulation_config';
 import { TradingConfig } from '../../trading/types';
 
-export async function simulateTrade(args: string[]) {
-    if (args.length !== 2) {
-        console.error('Usage: npx sigmaarena-vm simulate-trade <config.json> <strategy.ts>');
-        process.exit(1);
+export async function simulateTrade(args: string[]): Promise<{ errorCode: number; result?: SandboxResult }> {
+    if (args.length < 2) {
+        console.error('Usage: npx sigmaarena-vm simulate-trade <config.json> <strategy.ts> <save-results>');
+        return { errorCode: 1 };
     }
 
     const spinner = ora();
 
-    const [configPath, strategyPath] = args;
+    const configPath = args[0];
+    const strategyPath = args[1];
+    const saveResults = args.length >= 3 ? args[2].toLowerCase() === 'true' : false;
+
     const resolvedConfigPath = path.resolve(process.cwd(), configPath);
     const strategyFilename = path.resolve(process.cwd(), strategyPath);
 
     spinner.start('Validating configuration and strategy paths');
     if (!fs.existsSync(resolvedConfigPath)) {
         spinner.fail(`Config file not found: ${resolvedConfigPath}`);
-        process.exit(1);
+        return { errorCode: 1 };
     }
 
     if (!fs.existsSync(strategyFilename)) {
         spinner.fail(`Strategy file not found: ${strategyFilename}`);
-        process.exit(1);
+        return { errorCode: 1 };
     }
     spinner.succeed('Configuration and strategy paths validated');
 
@@ -42,14 +46,14 @@ export async function simulateTrade(args: string[]) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Failed to parse configuration JSON: ${message}`);
 
-        process.exit(1);
+        return { errorCode: 1 };
     }
 
     spinner.succeed('Configuration loaded');
 
     if (!configContent.tradingConfig || !configContent.simulationConfig || !configContent.exchangeConfig) {
         spinner.fail('Config file must contain tradingConfig, simulationConfig, and exchangeConfig sections');
-        process.exit(1);
+        return { errorCode: 1 };
     }
 
     const tradingConfig: TradingConfig = configContent.tradingConfig;
@@ -117,7 +121,7 @@ export async function simulateTrade(args: string[]) {
             const message = err instanceof Error ? err.message : String(err);
             spinner.fail(`Failed to fetch OHLCV data: ${message}`);
 
-            process.exit(1);
+            return { errorCode: 1 };
         }
 
         const candleCount = Array.isArray(ohlcvData) ? ohlcvData.length : 'requested';
@@ -138,18 +142,28 @@ export async function simulateTrade(args: string[]) {
 
     spinner.start('Running simulation with provided strategy');
 
-    let result;
+    let outcome;
 
     try {
-        result = await SimulationRunner.runSimulation({ strategyFilename, tradingConfig, simulationConfig, ohlcvData });
+        outcome = await SimulationRunner.runSimulation({ strategyFilename, tradingConfig, simulationConfig, ohlcvData });
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Simulation failed: ${message}`);
-        process.exit(1);
+
+        return { errorCode: 1 };
     }
     spinner.succeed('Simulation completed');
 
-    result.result?.trades?.forEach((trade: Record<string, any>) => {
+    if (!saveResults) {
+        return { errorCode: 0, result: outcome };
+    }
+
+    const result = outcome.result;
+    if (!result) {
+        return { errorCode: 1 };
+    }
+
+    result.trades?.forEach((trade: Record<string, any>) => {
         trade.timestamp = new Date(trade.timestamp).toISOString();
     });
 
@@ -157,20 +171,16 @@ export async function simulateTrade(args: string[]) {
     mkdirSync(path.join('./results'), { recursive: true });
 
     try {
-        const report = result.result?.report;
+        const report = result.report;
         if (report) {
             fs.writeFileSync(path.join('./results/trade_report.md'), report);
             console.log('Trade report saved to ./results/trade_report.md');
-
-            delete result.result.report;
         }
 
-        const trades = result.result?.trades;
+        const trades = result.trades;
         if (trades) {
             fs.writeFileSync(path.join('./results/trades.md'), JSON.stringify(trades, null, 4));
             console.log('Trades saved to ./results/trades.md');
-
-            delete result.result.trades;
         }
 
         fs.writeFileSync(path.join('./results/simulation_result.json'), JSON.stringify(result, null, 4));
@@ -179,8 +189,10 @@ export async function simulateTrade(args: string[]) {
         const message = err instanceof Error ? err.message : String(err);
         spinner.fail(`Failed to write simulation artifacts: ${message}`);
 
-        process.exit(1);
+        return { errorCode: 1 };
     }
 
     spinner.succeed('Simulation artifacts written to ./results');
+
+    return { errorCode: 0, result: outcome };
 }
