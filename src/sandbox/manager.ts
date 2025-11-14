@@ -51,7 +51,7 @@ export class SandboxManager {
         return new Promise((resolve, reject) => {
             logDebug('Building Docker image ...');
 
-            const build = spawn('docker', ['build', '-f', 'dist/sandbox/Dockerfile', '-t', this.imageName, '.']);
+            const build = spawn('docker', ['build', '-f', join(__dirname, 'Dockerfile'), '-t', this.imageName, __dirname]);
 
             build.stdout?.on('data', (data) => console.log(data.toString()));
             build.stderr?.on('data', (data) => console.error(data.toString()));
