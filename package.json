@@ -1,10 +1,10 @@
 {
     "name": "sigmaarena-vm",
-    "version": "1.0.14",
+    "version": "1.0.15",
     "description": "SigmaArena VM - SN127",
-    "main": "dist/index.js",
+    "main": "build/index.js",
     "bin": {
-        "sigmaarena-vm": "dist/index.js"
+        "sigmaarena-vm": "build/index.js"
     },
     "scripts": {
         "build": "tsc && node ./dist/utils/copy_files.js",
@@ -14,6 +14,7 @@
         "build-sandbox-image": "docker build -f src/sandbox/Dockerfile -t trading-sandbox:latest .",
         "cli": "ts-node src/index.ts",
         "simulate-trade": "npm run cli simulate-trade",
+        "prepublishOnly": "rm -rf build && mkdir build && cp -r dist/* build",
         "build:publish": "npm run build && npm publish --access public"
     },
     "keywords": [],
@@ -43,7 +44,6 @@
         "node": ">=20.0.0"
     },
     "files": [
-        "dist/**",
-        "dist/sandbox/Dockerfile"
+        "build/**"
     ]
 }
