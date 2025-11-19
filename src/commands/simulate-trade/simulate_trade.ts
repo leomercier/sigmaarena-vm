@@ -7,7 +7,19 @@ import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SandboxResult } from '../../sandbox/manager';
 import { SimulationRunner } from '../../trading/simulation/sandbox_runner';
 import { SimulationConfig } from '../../trading/simulation/simulation_config';
-import { TradingConfig } from '../../trading/types';
+import { OHLCVData, TradingConfig } from '../../trading/types';
+import { getErrorMetadata } from '../../utils/errors';
+import { logError, logWarning } from '../../utils/logging';
+
+export interface SimulateExchangeConfig {
+    exchangeId: string;
+    exchangeType: 'spot' | 'futures';
+    address: string;
+    symbol: string;
+    timeFrom: string;
+    timeTo: string;
+    intervalType: string;
+}
 
 export async function simulateTrade(args: string[]): Promise<{ errorCode: number; result?: SandboxResult }> {
     if (args.length < 2) {
@@ -60,85 +72,15 @@ export async function simulateTrade(args: string[]): Promise<{ errorCode: number
     const simulationConfig: SimulationConfig = configContent.simulationConfig;
     const exchangeConfig = configContent.exchangeConfig;
 
-    const ohlcvInputData: OHLCVExchangeInputData = {
-        exchangeId: exchangeConfig.exchangeId,
-        exchangeType: exchangeConfig.exchangeType,
-        address: exchangeConfig.address,
-        symbol: exchangeConfig.symbol,
-        timeFrom: new Date(exchangeConfig.timeFrom),
-        timeTo: new Date(exchangeConfig.timeTo),
-        intervalType: exchangeConfig.intervalType
-    };
+    spinner.start('Loading OHLCV data for the specified exchange configuration');
 
-    const cacheKeySeed = JSON.stringify({
-        exchangeId: exchangeConfig.exchangeId,
-        exchangeType: exchangeConfig.exchangeType,
-        address: exchangeConfig.address,
-        symbol: exchangeConfig.symbol,
-        intervalType: exchangeConfig.intervalType,
-        timeFrom: exchangeConfig.timeFrom,
-        timeTo: exchangeConfig.timeTo,
-        config: path.resolve(resolvedConfigPath)
-    });
-
-    const cacheKey = createHash('sha256').update(cacheKeySeed).digest('hex').slice(0, 16);
-    const cacheDir = path.join('./.cache', 'ohlcv');
-    const cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
-
-    spinner.start('Checking OHLCV cache');
-
-    let ohlcvData;
-    let cacheHit = false;
-
-    if (fs.existsSync(cacheFilePath)) {
-        try {
-            const cachedPayload = fs.readFileSync(cacheFilePath, 'utf8');
-            ohlcvData = JSON.parse(cachedPayload);
-            cacheHit = true;
-
-            const cachedCount = Array.isArray(ohlcvData) ? ohlcvData.length : 'cached';
-            spinner.succeed(`Loaded OHLCV data from cache (${cachedCount} entries)`);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            spinner.fail(`Cache read failed, fetching fresh data: ${message}`);
-
-            try {
-                fs.unlinkSync(cacheFilePath);
-            } catch {
-                // If we can't delete the cache file, carry on and overwrite after refetch.
-            }
-        }
-    } else {
-        spinner.succeed('Cache miss; fetching fresh OHLCV data');
+    const ohlcvData = await loadOHLCVData(exchangeConfig);
+    if (!ohlcvData) {
+        spinner.fail('Failed to load OHLCV data for the specified exchange configuration');
+        return { errorCode: 1 };
     }
 
-    if (!cacheHit) {
-        spinner.start(`Fetching OHLCV data for ${ohlcvInputData.symbol} from ${ohlcvInputData.exchangeId}`);
-
-        try {
-            ohlcvData = await getExchangeTokenOHLCVs(ohlcvInputData);
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            spinner.fail(`Failed to fetch OHLCV data: ${message}`);
-
-            return { errorCode: 1 };
-        }
-
-        const candleCount = Array.isArray(ohlcvData) ? ohlcvData.length : 'requested';
-        spinner.succeed(`Fetched ${candleCount} OHLCV entries`);
-
-        spinner.start('Caching OHLCV dataset for future runs');
-
-        try {
-            mkdirSync(cacheDir, { recursive: true });
-            fs.writeFileSync(cacheFilePath, JSON.stringify(ohlcvData));
-
-            spinner.succeed('OHLCV dataset cached');
-        } catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            spinner.fail(`Failed to write OHLCV cache: ${message}`);
-        }
-    }
+    spinner.succeed('OHLCV data loaded');
 
     spinner.start('Running simulation with provided strategy');
 
@@ -195,4 +137,63 @@ export async function simulateTrade(args: string[]): Promise<{ errorCode: number
     spinner.succeed('Simulation artifacts written to ./results');
 
     return { errorCode: 0, result: outcome };
+}
+
+export async function loadOHLCVData(exchangeConfig: SimulateExchangeConfig): Promise<OHLCVData[] | null> {
+    const ohlcvInputData: OHLCVExchangeInputData = {
+        exchangeId: exchangeConfig.exchangeId,
+        exchangeType: exchangeConfig.exchangeType,
+        address: exchangeConfig.address,
+        symbol: exchangeConfig.symbol,
+        timeFrom: new Date(exchangeConfig.timeFrom),
+        timeTo: new Date(exchangeConfig.timeTo),
+        intervalType: exchangeConfig.intervalType
+    };
+
+    const cacheKeySeed = JSON.stringify({
+        exchangeId: exchangeConfig.exchangeId,
+        exchangeType: exchangeConfig.exchangeType,
+        address: exchangeConfig.address,
+        symbol: exchangeConfig.symbol,
+        intervalType: exchangeConfig.intervalType,
+        timeFrom: exchangeConfig.timeFrom,
+        timeTo: exchangeConfig.timeTo
+    });
+
+    const cacheKey = createHash('sha256').update(cacheKeySeed).digest('hex').slice(0, 16);
+    const cacheDir = path.join('./.cache', 'ohlcv');
+    const cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
+
+    let ohlcvData: OHLCVData[] | null = null;
+
+    if (fs.existsSync(cacheFilePath)) {
+        try {
+            const cachedPayload = fs.readFileSync(cacheFilePath, 'utf8');
+            return JSON.parse(cachedPayload);
+        } catch (err) {
+            logWarning('Failed to read OHLCV cache, refetching data', getErrorMetadata(err as Error));
+
+            try {
+                fs.unlinkSync(cacheFilePath);
+            } catch (unlinkErr) {
+                logWarning('Failed to delete corrupted OHLCV cache file', getErrorMetadata(unlinkErr as Error));
+            }
+        }
+    }
+
+    try {
+        ohlcvData = await getExchangeTokenOHLCVs(ohlcvInputData);
+    } catch (err) {
+        logError('Failed to fetch OHLCV data', getErrorMetadata(err as Error));
+        return null;
+    }
+
+    try {
+        mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cacheFilePath, JSON.stringify(ohlcvData));
+    } catch (err) {
+        logWarning('Failed to write OHLCV cache file', getErrorMetadata(err as Error));
+    }
+
+    return ohlcvData;
 }
