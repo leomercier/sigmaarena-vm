@@ -19,7 +19,7 @@ export interface SimulationRunnerConfig {
 
 export class SimulationRunner {
     static async runSimulation(runnerConfig: SimulationRunnerConfig): Promise<SandboxResult> {
-        const sandboxManager = new SandboxManager();
+        const sandboxManager = new SandboxManager(config.dockerSocketPath);
 
         try {
             await sandboxManager.initialize();

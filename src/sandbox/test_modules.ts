@@ -1,3 +1,4 @@
+import config from '../config/config';
 import { getErrorMetadata } from '../utils/errors';
 import { logError, logInfo } from '../utils/logging';
 import { SandboxManager } from './manager';
@@ -18,7 +19,7 @@ export function testProxy() {
 }
 
 export async function testManager() {
-    const manager = new SandboxManager();
+    const manager = new SandboxManager(config.dockerSocketPath);
 
     try {
         await manager.initialize();
@@ -98,5 +99,6 @@ export async function testManager() {
     }
 }
 
-// testProxy();
-// testManager();
+if (require.main === module) {
+    testManager();
+}

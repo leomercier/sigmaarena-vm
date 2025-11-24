@@ -12,6 +12,7 @@ interface Config {
 
     userId: string;
 
+    dockerSocketPath: string;
     sandboxWorkspaceFolder: string;
 
     developmentConfig: DevelopmentConfig;
@@ -32,6 +33,7 @@ const config: Config = {
 
     userId: process.env.USER_ID || 'sigmaarena_vm_user',
 
+    dockerSocketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
     sandboxWorkspaceFolder: process.env.SANDBOX_WORKSPACE_FOLDER || '',
 
     developmentConfig: {

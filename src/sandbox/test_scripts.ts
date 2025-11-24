@@ -1,7 +1,8 @@
+import config from '../config/config';
 import { SandboxManager } from './manager';
 
 async function runExamples() {
-    const manager = new SandboxManager();
+    const manager = new SandboxManager(config.dockerSocketPath);
 
     // Example 1: Simple calculation
     console.log('\n=== Example 1: Simple Calculation ===');

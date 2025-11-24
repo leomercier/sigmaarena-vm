@@ -1,8 +1,10 @@
-import { ChildProcess, spawn } from 'child_process';
+import { spawn } from 'child_process';
 import { randomUUID } from 'crypto';
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import Docker, { Container } from 'dockerode';
+import fs, { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
 import { copy } from 'fs-extra';
 import { dirname, join } from 'path';
+import * as tar from 'tar-fs';
 import { PnLResult } from '../trading/types';
 import { delays } from '../utils/delays';
 import { getErrorMetadata } from '../utils/errors';
@@ -31,16 +33,19 @@ export interface SandboxResult {
 }
 
 export class SandboxManager {
+    private docker: Docker;
     private imageName = 'trading-sandbox:latest';
-    private runningContainers = new Map<string, ChildProcess>();
+    private runningContainers = new Map<string, Container>();
     private proxy: FilteringProxy | null = null;
     private proxyPort = 8888;
 
-    constructor() {
+    constructor(dockerSocketPath: string) {
         this.proxy = new FilteringProxy({
             port: this.proxyPort,
             allowedDomains: []
         });
+
+        this.docker = new Docker({ socketPath: dockerSocketPath });
     }
 
     async initialize(): Promise<void> {
@@ -50,22 +55,51 @@ export class SandboxManager {
     }
 
     async buildImage(): Promise<void> {
+        console.log('Building Docker image...');
+
+        const context = tar.pack(__dirname, {
+            entries: ['Dockerfile', ...fs.readdirSync(__dirname)]
+        });
+
         return new Promise((resolve, reject) => {
-            logDebug('Building Docker image ...');
+            this.docker.buildImage(
+                context,
+                {
+                    t: this.imageName,
+                    dockerfile: 'Dockerfile'
+                },
+                (err, stream) => {
+                    if (err) return reject(err);
+                    if (!stream) return reject(new Error('No build stream returned'));
 
-            const build = spawn('docker', ['build', '-f', join(__dirname, 'Dockerfile'), '-t', this.imageName, __dirname]);
+                    // Print ALL events
+                    this.docker.modem.followProgress(
+                        stream,
+                        (err) => {
+                            if (err) return reject(err);
+                            console.log('Image built successfully');
+                            resolve();
+                        },
+                        (event) => {
+                            if (event.stream && event.stream.startsWith('Step')) {
+                                console.log(event.stream);
+                            }
 
-            build.stdout?.on('data', (data) => console.log(data.toString()));
-            build.stderr?.on('data', (data) => console.error(data.toString()));
+                            if (event.error) {
+                                console.error(event.error);
+                            }
 
-            build.on('close', (code) => {
-                if (code === 0) {
-                    logDebug('Image built successfully');
-                    resolve();
-                } else {
-                    reject(new Error(`Build failed with code ${code}`));
+                            if (event.status) {
+                                console.log(event.status);
+                            }
+
+                            if (event.progress) {
+                                console.log(event.progress);
+                            }
+                        }
+                    );
                 }
-            });
+            );
         });
     }
 
@@ -123,53 +157,51 @@ export class SandboxManager {
             const scriptsSourceFolder = sandboxConfig.workspaceFolder ? join(sandboxConfig.workspaceFolder, containerId, 'scripts') : scriptsDir;
             const outputSourceFolder = sandboxConfig.workspaceFolder ? join(sandboxConfig.workspaceFolder, containerId, 'output') : outputDir;
 
-            const dockerArgs = [
-                'run',
-                '--rm', // Re-enable this to auto-cleanup containers
-                '--name',
-                containerId,
-                '--cpus',
-                String(sandboxConfig.maxCpus || 0.5),
-                '--memory',
-                `${sandboxConfig.maxMemoryMb || 256}m`,
-                // '--storage-opt',
-                // `size=${sandboxConfig.maxStorageMb || 100}m`,
-                '--read-only',
-                '--tmpfs',
-                '/tmp:rw,noexec,nosuid,size=10m',
-                '--security-opt',
-                'no-new-privileges',
-                '--cap-drop',
-                'ALL',
-                '-v',
-                `${scriptsSourceFolder}:/app/scripts:ro`,
-                '-v',
-                `${outputSourceFolder}:/app/output:rw`
-            ];
+            const hostConfig: Docker.HostConfig = {
+                AutoRemove: true,
+                ReadonlyRootfs: true,
+                CpuCount: 1,
+                NanoCpus: Math.floor((sandboxConfig.maxCpus || 0.5) * 1e9),
+                Memory: (sandboxConfig.maxMemoryMb || 256) * 1024 * 1024,
 
-            // Configure network based on allowed endpoints
-            if (sandboxConfig.allowedEndpoints && sandboxConfig.allowedEndpoints.length > 0) {
-                // Use bridge network with proxy
-                dockerArgs.push('--network', 'bridge');
-                dockerArgs.push('--add-host', 'host.docker.internal:host-gateway');
-                dockerArgs.push('-e', `HTTP_PROXY=${proxyUrl}`);
-                dockerArgs.push('-e', `HTTPS_PROXY=${proxyUrl}`);
-                dockerArgs.push('-e', `http_proxy=${proxyUrl}`);
-                dockerArgs.push('-e', `https_proxy=${proxyUrl}`);
+                Tmpfs: {
+                    '/tmp': 'rw,noexec,nosuid,size=10m'
+                },
 
-                // Prevent proxy from being used for localhost/internal addresses
-                dockerArgs.push('-e', `NO_PROXY=localhost,127.0.0.1,::1`);
-                dockerArgs.push('-e', `no_proxy=localhost,127.0.0.1,::1`);
+                CapDrop: ['ALL'],
+                SecurityOpt: ['no-new-privileges'],
 
-                logDebug(`Using proxy: ${proxyUrl}`);
+                Binds: [
+                    `${scriptsSourceFolder}:/app/scripts:ro`,
+                    `${outputSourceFolder}:/app/output:rw` //
+                ]
+            };
+
+            let env: string[] = [];
+
+            if (sandboxConfig.allowedEndpoints?.length) {
+                hostConfig.NetworkMode = 'bridge';
+
+                env.push(
+                    `HTTP_PROXY=${proxyUrl}`,
+                    `HTTPS_PROXY=${proxyUrl}`,
+                    `http_proxy=${proxyUrl}`,
+                    `https_proxy=${proxyUrl}`,
+                    `NO_PROXY=localhost,127.0.0.1,::1`,
+                    `no_proxy=localhost,127.0.0.1,::1`
+                );
             } else {
-                // No network access
-                dockerArgs.push('--network', 'none');
+                hostConfig.NetworkMode = 'none';
             }
 
-            dockerArgs.push(this.imageName);
+            const container = await this.docker.createContainer({
+                name: containerId,
+                Image: this.imageName,
+                Env: env,
+                HostConfig: hostConfig
+            });
 
-            await this.runContainer(containerId, dockerArgs, sandboxConfig.timeoutMs || delays.fiveMinutes);
+            await this.runContainer(containerId, container, sandboxConfig.timeoutMs || delays.fiveMinutes);
 
             const resultPath = join(outputDir, 'result.json');
             const output = JSON.parse(readFileSync(resultPath, 'utf-8'));
@@ -189,7 +221,9 @@ export class SandboxManager {
             this.runningContainers.delete(containerId);
             try {
                 rmSync(workDir, { recursive: true, force: true });
-                rmSync(join(process.cwd(), 'temp'), { recursive: true });
+                if (!sandboxConfig.workspaceFolder) {
+                    rmSync(join(process.cwd(), 'temp'), { recursive: true, force: true });
+                }
             } catch (err) {
                 logError('Cleanup error', getErrorMetadata(err as Error));
             }
@@ -198,45 +232,58 @@ export class SandboxManager {
         }
     }
 
-    private async runContainer(containerId: string, dockerArgs: string[], timeoutMs: number): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const container = spawn('docker', dockerArgs);
+    private async runContainer(containerId: string, container: Container, timeoutMs: number): Promise<void> {
+        return new Promise(async (resolve, reject) => {
             this.runningContainers.set(containerId, container);
 
             let stderr = '';
 
-            container.stdout?.on('data', (data) => {
-                console.log('[Container]', data.toString());
+            await container.start();
+
+            const logStream = await container.logs({
+                follow: true,
+                stdout: true,
+                stderr: true
             });
 
-            container.stderr?.on('data', (data) => {
-                stderr += data.toString();
-                console.error('[Container Error]', data.toString());
-            });
-
-            // Timeout handler
-            const timeout = setTimeout(() => {
-                logDebug(`Container ${containerId} timeout, stopping ...`);
-                this.stopContainer(containerId);
-                reject(new Error('Container execution timeout'));
-            }, timeoutMs);
-
-            container.on('close', (code) => {
-                clearTimeout(timeout);
-                this.runningContainers.delete(containerId);
-
-                if (code === 0) {
-                    resolve();
+            logStream.on('data', (chunk: Buffer) => {
+                const text = chunk.toString();
+                if (text.includes('stderr')) {
+                    stderr += text;
+                    console.error('[Container Error]', text);
                 } else {
-                    reject(new Error(`Container exited with code ${code}\n${stderr}`));
+                    console.log('[Container]', text);
                 }
             });
 
-            container.on('error', (error) => {
+            const timeout = setTimeout(async () => {
+                logDebug(`Container ${containerId} timeout, stopping ...`);
+
+                try {
+                    await this.stopContainer(containerId);
+                } catch {}
+
+                reject(new Error('Container execution timeout'));
+            }, timeoutMs);
+
+            // Wait for the container to exit
+            try {
+                const result = await container.wait();
+
                 clearTimeout(timeout);
                 this.runningContainers.delete(containerId);
-                reject(error);
-            });
+
+                if (result.StatusCode === 0) {
+                    resolve();
+                } else {
+                    reject(new Error(`Container exited with code ${result.StatusCode}\n${stderr}`));
+                }
+            } catch (err) {
+                clearTimeout(timeout);
+                this.runningContainers.delete(containerId);
+
+                reject(err);
+            }
         });
     }
 
@@ -317,19 +364,25 @@ export class SandboxManager {
     }
 
     async stopContainer(containerId: string): Promise<void> {
-        const container = this.runningContainers.get(containerId);
+        const container = this.docker.getContainer(containerId);
 
-        if (container) {
-            container.kill('SIGTERM');
+        try {
+            await container.kill({ signal: 'SIGTERM' });
+        } catch (err: any) {
+            if (err.statusCode !== 409 && err.statusCode !== 404) {
+                throw err;
+            }
         }
 
-        return new Promise((resolve) => {
-            const stop = spawn('docker', ['stop', '-t', '2', containerId]);
-            stop.on('close', () => {
-                this.runningContainers.delete(containerId);
-                resolve();
-            });
-        });
+        try {
+            await container.stop({ t: 2 });
+        } catch (err: any) {
+            if (err.statusCode !== 304 && err.statusCode !== 404) {
+                throw err;
+            }
+        }
+
+        this.runningContainers.delete(containerId);
     }
 
     async listRunningContainers(): Promise<string[]> {
