@@ -1,5 +1,3 @@
-import { readFileSync } from 'fs';
-import path from 'path';
 import { getLLMFunctionsInstance } from '../llm_functions';
 import { Trading } from '../trading_class';
 import { LLMConfig, OHLCVData, PnLResult, TradingConfig } from '../types';
@@ -69,31 +67,15 @@ export class SandboxStrategyRunner {
 
             const pnlResult = this.calculatePnL(executor, finalPrices);
 
-            const reportPath = '/app/output/trade_report.md';
             const reportGenerator = executor.getReportGenerator();
-
-            if (reportGenerator && reportPath) {
-                const ext = path.extname(reportPath).toLowerCase();
-                let format: 'csv' | 'json' | 'markdown' = 'markdown';
-
-                if (ext === '.csv') {
-                    format = 'csv';
-                } else if (ext === '.json') {
-                    format = 'json';
-                } else if (ext === '.md' || ext === '.markdown') {
-                    format = 'markdown';
-                }
-
-                reportGenerator.saveReport(reportPath, format);
-
+            if (reportGenerator) {
                 const summary = reportGenerator.getSummary();
                 console.log('\n=== Trade Report Summary ===');
                 console.log(`Total Trades: ${summary.totalTrades}`);
                 console.log(`Win Rate: ${summary.winRate.toFixed(2)}%`);
                 console.log(`Final PnL: ${summary.finalPnL.toFixed(2)} ${pnlResult.baseToken} (${summary.finalPnLPercent.toFixed(2)}%)`);
-                console.log(`Report saved to: ${reportPath}\n`);
 
-                pnlResult.report = readFileSync(reportPath, 'utf-8');
+                pnlResult.report = reportGenerator.getMarkdownReport();
             }
 
             return pnlResult;

@@ -492,7 +492,8 @@ export class TradeReportGenerator {
                 this.saveJSONReport(outputPath, summary);
                 break;
             case 'markdown':
-                this.saveMarkdownReport(outputPath, summary);
+                const report = this.getMarkdownReport();
+                fs.writeFileSync(outputPath, report);
                 break;
         }
 
@@ -614,10 +615,9 @@ export class TradeReportGenerator {
         fs.writeFileSync(outputPath, JSON.stringify(report, null, 2));
     }
 
-    /**
-     * Save report as Markdown
-     */
-    private saveMarkdownReport(outputPath: string, summary: TradeReportSummary): void {
+    getMarkdownReport(): string {
+        const summary = this.generateSummary();
+
         const lines: string[] = [];
 
         // Title
@@ -735,7 +735,7 @@ export class TradeReportGenerator {
             lines.push(`| ${entry.tradeNumber} | ${entry.baseTokenAfter.toFixed(2)} | ${entry.liquidatedBalanceAfter.toFixed(2)} | ${cumPnL} |`);
         }
 
-        fs.writeFileSync(outputPath, lines.join('\n'));
+        return lines.join('\n');
     }
 
     /**
