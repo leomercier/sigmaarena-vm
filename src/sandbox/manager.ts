@@ -11,6 +11,7 @@ import { FilteringProxy } from './proxy_server';
 
 export interface SandboxConfig {
     script: string;
+    workspaceFolder?: string;
     timeoutMs?: number;
     maxCpus?: number;
     maxMemoryMb?: number;
@@ -70,7 +71,12 @@ export class SandboxManager {
 
     async executeScript(sandboxConfig: SandboxConfig): Promise<SandboxResult> {
         const containerId = `sandbox-${randomUUID()}`;
-        const workDir = join(process.cwd(), 'temp', containerId);
+
+        let workDir = join(join(process.cwd(), 'temp'), containerId);
+        if (sandboxConfig.workspaceFolder) {
+            workDir = join('/sandbox-data', containerId);
+        }
+
         const scriptsDir = join(workDir, 'scripts');
         const outputDir = join(workDir, 'output');
 
@@ -114,6 +120,9 @@ export class SandboxManager {
             // Get proxy URL for this platform
             const proxyUrl = await this.getProxyUrl();
 
+            const scriptsSourceFolder = sandboxConfig.workspaceFolder ? join(sandboxConfig.workspaceFolder, containerId, 'scripts') : scriptsDir;
+            const outputSourceFolder = sandboxConfig.workspaceFolder ? join(sandboxConfig.workspaceFolder, containerId, 'output') : outputDir;
+
             const dockerArgs = [
                 'run',
                 '--rm', // Re-enable this to auto-cleanup containers
@@ -133,9 +142,9 @@ export class SandboxManager {
                 '--cap-drop',
                 'ALL',
                 '-v',
-                `${scriptsDir}:/app/scripts:ro`,
+                `${scriptsSourceFolder}:/app/scripts:ro`,
                 '-v',
-                `${outputDir}:/app/output:rw`
+                `${outputSourceFolder}:/app/output:rw`
             ];
 
             // Configure network based on allowed endpoints

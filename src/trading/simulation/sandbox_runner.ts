@@ -89,19 +89,20 @@ export class SimulationRunner {
 
             const result = await sandboxManager.executeScript({
                 script: `
-                import { SandboxStrategyRunner } from './simulation/sandbox_strategy_runner';
-                import config from './config.json';
-                import ohlcvData from './ohlcv_data.json';
-                import { join } from 'path';
+                    import { SandboxStrategyRunner } from './simulation/sandbox_strategy_runner';
+                    import config from './config.json';
+                    import ohlcvData from './ohlcv_data.json';
+                    import { join } from 'path';
 
-                export async function runScript() {
-                    const strategyFilename = join(__dirname, './strategies/strategy.ts');
-                    const strategyRunner = new SandboxStrategyRunner(config);
-                    const result = await strategyRunner.runSimulation(strategyFilename, ohlcvData);
+                    export async function runScript() {
+                        const strategyFilename = join(__dirname, './strategies/strategy.ts');
+                        const strategyRunner = new SandboxStrategyRunner(config);
+                        const result = await strategyRunner.runSimulation(strategyFilename, ohlcvData);
 
-                    return result;
-                }
-            `,
+                        return result;
+                    }
+                `,
+                workspaceFolder: config.sandboxWorkspaceFolder,
                 allowedEndpoints: [config.llmBaseUrl],
                 files,
                 folders

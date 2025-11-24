@@ -12,6 +12,8 @@ interface Config {
 
     userId: string;
 
+    sandboxWorkspaceFolder: string;
+
     developmentConfig: DevelopmentConfig;
 }
 
@@ -29,6 +31,8 @@ const config: Config = {
     llmBaseUrl: process.env.LLM_BASE_URL || '',
 
     userId: process.env.USER_ID || 'sigmaarena_vm_user',
+
+    sandboxWorkspaceFolder: process.env.SANDBOX_WORKSPACE_FOLDER || '',
 
     developmentConfig: {
         enabled: process.env.DEVELOPMENT_ENABLED === 'true',
