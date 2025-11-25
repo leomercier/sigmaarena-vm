@@ -1,4 +1,4 @@
-import { spawn } from 'child_process';
+import { execSync, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
 import Docker, { Container } from 'dockerode';
 import fs, { mkdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
@@ -120,6 +120,10 @@ export class SandboxManager {
             // Create temporary directories
             mkdirSync(scriptsDir, { recursive: true });
             mkdirSync(outputDir, { recursive: true });
+
+            if (sandboxConfig.workspaceFolder) {
+                execSync(`chown -R 1000:1000 ${outputDir}`);
+            }
 
             // Write user script to file
             writeFileSync(join(scriptsDir, 'user_script.ts'), sandboxConfig.script);
