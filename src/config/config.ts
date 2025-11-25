@@ -21,6 +21,7 @@ interface Config {
 export interface DevelopmentConfig {
     enabled: boolean;
     logRawToConsole: boolean;
+    cleanOnEnd: boolean;
 }
 
 const config: Config = {
@@ -38,7 +39,8 @@ const config: Config = {
 
     developmentConfig: {
         enabled: process.env.DEVELOPMENT_ENABLED === 'true',
-        logRawToConsole: process.env.DEVELOPMENT_LOG_RAW_TO_CONSOLE === 'true'
+        logRawToConsole: process.env.DEVELOPMENT_LOG_RAW_TO_CONSOLE === 'true',
+        cleanOnEnd: process.env.DEVELOPMENT_CLEAN_ON_END !== 'false'
     }
 };
 

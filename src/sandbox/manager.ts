@@ -38,14 +38,16 @@ export class SandboxManager {
     private runningContainers = new Map<string, Container>();
     private proxy: FilteringProxy | null = null;
     private proxyPort = 8888;
+    private cleanOnEnd: boolean;
 
-    constructor(dockerSocketPath: string) {
+    constructor(dockerSocketPath: string, cleanOnEnd: boolean = true) {
         this.proxy = new FilteringProxy({
             port: this.proxyPort,
             allowedDomains: []
         });
 
         this.docker = new Docker({ socketPath: dockerSocketPath });
+        this.cleanOnEnd = cleanOnEnd;
     }
 
     async initialize(): Promise<void> {
@@ -219,16 +221,18 @@ export class SandboxManager {
             };
         } finally {
             this.runningContainers.delete(containerId);
-            try {
-                rmSync(workDir, { recursive: true, force: true });
-                if (!sandboxConfig.workspaceFolder) {
-                    rmSync(join(process.cwd(), 'temp'), { recursive: true, force: true });
+            if (this.cleanOnEnd) {
+                try {
+                    rmSync(workDir, { recursive: true, force: true });
+                    if (!sandboxConfig.workspaceFolder) {
+                        rmSync(join(process.cwd(), 'temp'), { recursive: true, force: true });
+                    }
+                } catch (err) {
+                    logError('Cleanup error', getErrorMetadata(err as Error));
                 }
-            } catch (err) {
-                logError('Cleanup error', getErrorMetadata(err as Error));
-            }
 
-            await this.cleanup();
+                await this.cleanup();
+            }
         }
     }
 
