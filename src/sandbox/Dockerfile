@@ -11,13 +11,6 @@ RUN npm install axios lodash dayjs uuid zod zod-to-json-schema
 
 COPY runner.ts /app/runner.ts
 
-# Create directories with restricted permissions
-RUN mkdir -p /app/scripts
-RUN mkdir -p /app/output
-
-RUN chown -R sandbox:sandbox /app
-RUN chmod 755 /app/scripts /app/output
-
 USER sandbox
 
 # Set resource limits (enforced by Docker run command)
