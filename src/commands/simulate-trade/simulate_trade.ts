@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import fs, { mkdirSync } from 'fs';
 import ora from 'ora';
 import path from 'path';
+import config from '../../config/config';
 import { getExchangeTokenOHLCVs } from '../../providers/ccxt/ohlcv';
 import { OHLCVExchangeInputData } from '../../providers/ccxt/types';
 import { SandboxResult } from '../../sandbox/manager';
@@ -109,32 +110,34 @@ export async function simulateTrade(args: string[]): Promise<{ errorCode: number
         trade.timestamp = new Date(trade.timestamp).toISOString();
     });
 
-    spinner.start('Writing simulation artifacts to ./results');
-    mkdirSync(path.join('./results'), { recursive: true });
+    if (config.resultsFolder) {
+        spinner.start(`Writing simulation artifacts to ${config.resultsFolder}`);
+        mkdirSync(path.join(config.resultsFolder), { recursive: true });
 
-    try {
-        const report = result.report;
-        if (report) {
-            fs.writeFileSync(path.join('./results/trade_report.md'), report);
-            console.log('Trade report saved to ./results/trade_report.md');
+        try {
+            const report = result.report;
+            if (report) {
+                fs.writeFileSync(path.join(config.resultsFolder, 'trade_report.md'), report);
+                console.log(`Trade report saved to ${path.join(config.resultsFolder, 'trade_report.md')}`);
+            }
+
+            const trades = result.trades;
+            if (trades) {
+                fs.writeFileSync(path.join(config.resultsFolder, 'trades.md'), JSON.stringify(trades, null, 4));
+                console.log(`Trades saved to ${path.join(config.resultsFolder, 'trades.md')}`);
+            }
+
+            fs.writeFileSync(path.join(config.resultsFolder, 'simulation_result.json'), JSON.stringify(result, null, 4));
+            console.log(`Simulation result saved to ${path.join(config.resultsFolder, 'simulation_result.json')}`);
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            spinner.fail(`Failed to write simulation artifacts: ${message}`);
+
+            return { errorCode: 1 };
         }
 
-        const trades = result.trades;
-        if (trades) {
-            fs.writeFileSync(path.join('./results/trades.md'), JSON.stringify(trades, null, 4));
-            console.log('Trades saved to ./results/trades.md');
-        }
-
-        fs.writeFileSync(path.join('./results/simulation_result.json'), JSON.stringify(result, null, 4));
-        console.log('Simulation result saved to ./results/simulation_result.json');
-    } catch (err) {
-        const message = err instanceof Error ? err.message : String(err);
-        spinner.fail(`Failed to write simulation artifacts: ${message}`);
-
-        return { errorCode: 1 };
+        spinner.succeed(`Simulation artifacts written to ${config.resultsFolder}`);
     }
-
-    spinner.succeed('Simulation artifacts written to ./results');
 
     return { errorCode: 0, result: outcome };
 }
@@ -160,23 +163,27 @@ export async function loadOHLCVData(exchangeConfig: SimulateExchangeConfig): Pro
         timeTo: exchangeConfig.timeTo
     });
 
-    const cacheKey = createHash('sha256').update(cacheKeySeed).digest('hex').slice(0, 16);
-    const cacheDir = path.join('./.cache', 'ohlcv');
-    const cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
-
     let ohlcvData: OHLCVData[] | null = null;
+    let cacheDir: string | null = null;
+    let cacheFilePath: string | null = null;
 
-    if (fs.existsSync(cacheFilePath)) {
-        try {
-            const cachedPayload = fs.readFileSync(cacheFilePath, 'utf8');
-            return JSON.parse(cachedPayload);
-        } catch (err) {
-            logWarning('Failed to read OHLCV cache, refetching data', getErrorMetadata(err as Error));
+    if (config.cacheFolder) {
+        const cacheKey = createHash('sha256').update(cacheKeySeed).digest('hex').slice(0, 16);
+        cacheDir = path.join(config.cacheFolder, 'ohlcv');
+        cacheFilePath = path.join(cacheDir, `${cacheKey}.json`);
 
+        if (fs.existsSync(cacheFilePath)) {
             try {
-                fs.unlinkSync(cacheFilePath);
-            } catch (unlinkErr) {
-                logWarning('Failed to delete corrupted OHLCV cache file', getErrorMetadata(unlinkErr as Error));
+                const cachedPayload = fs.readFileSync(cacheFilePath, 'utf8');
+                return JSON.parse(cachedPayload);
+            } catch (err) {
+                logWarning('Failed to read OHLCV cache, refetching data', getErrorMetadata(err as Error));
+
+                try {
+                    fs.unlinkSync(cacheFilePath);
+                } catch (unlinkErr) {
+                    logWarning('Failed to delete corrupted OHLCV cache file', getErrorMetadata(unlinkErr as Error));
+                }
             }
         }
     }
@@ -188,11 +195,13 @@ export async function loadOHLCVData(exchangeConfig: SimulateExchangeConfig): Pro
         return null;
     }
 
-    try {
-        mkdirSync(cacheDir, { recursive: true });
-        fs.writeFileSync(cacheFilePath, JSON.stringify(ohlcvData));
-    } catch (err) {
-        logWarning('Failed to write OHLCV cache file', getErrorMetadata(err as Error));
+    if (cacheDir && cacheFilePath) {
+        try {
+            mkdirSync(cacheDir, { recursive: true });
+            fs.writeFileSync(cacheFilePath, JSON.stringify(ohlcvData));
+        } catch (err) {
+            logWarning('Failed to write OHLCV cache file', getErrorMetadata(err as Error));
+        }
     }
 
     return ohlcvData;

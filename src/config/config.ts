@@ -15,6 +15,9 @@ interface Config {
     dockerSocketPath: string;
     sandboxWorkspaceFolder: string;
 
+    resultsFolder: string;
+    cacheFolder: string;
+
     developmentConfig: DevelopmentConfig;
 }
 
@@ -36,6 +39,9 @@ const config: Config = {
 
     dockerSocketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock',
     sandboxWorkspaceFolder: process.env.SANDBOX_WORKSPACE_FOLDER || '',
+
+    resultsFolder: process.env.RESULTS_FOLDER || '',
+    cacheFolder: process.env.CACHE_FOLDER || '',
 
     developmentConfig: {
         enabled: process.env.DEVELOPMENT_ENABLED === 'true',

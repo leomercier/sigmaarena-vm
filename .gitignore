@@ -1,8 +1,6 @@
 .env
 dist
-results
+data
 node_modules
 .DS_Store
-.cache
-temp
 build
