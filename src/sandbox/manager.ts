@@ -122,7 +122,7 @@ export class SandboxManager {
             mkdirSync(outputDir, { recursive: true });
 
             if (sandboxConfig.workspaceFolder) {
-                execSync(`chown -R 1000:1000 ${outputDir}`);
+                execSync(`chown -R 100:101 ${outputDir}`);
             }
 
             // Write user script to file
